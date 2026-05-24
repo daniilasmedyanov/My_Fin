@@ -53,6 +53,14 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .pad .h-sub{font-size:12px;color:var(--mut);font-weight:500;margin-bottom:12px}
 .chart-box{position:relative;height:280px}
 .chart-box canvas{max-width:100%!important}
+.mini{font-family:'Manrope';cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--mut2);padding:4px 9px;border-radius:7px;font-size:11px;font-weight:700}
+.mini:hover{border-color:var(--accent);color:var(--accent)}
+.debt-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+.debt-item{display:flex;justify-content:space-between;align-items:center;padding:11px 12px;border:1px solid var(--line2);border-radius:11px;margin-bottom:8px}
+.debt-item.closed{opacity:.5}
+.debt-item .who{font-weight:700;font-size:13px}
+.debt-item .det{font-size:11px;color:var(--mut2)}
+.debt-col h3{font-size:13px;font-weight:800;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut2)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;color:var(--mut);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:9px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
 th.r{text-align:right}
@@ -105,6 +113,8 @@ tr:hover td{background:#fafbfc}
   th,td{padding:8px 7px}
   .modal-box{padding:18px}
   .foot{font-size:11px}
+  .debt-cards{grid-template-columns:1fr}
+  #debtCols{grid-template-columns:1fr!important}
 }
 @media(max-width:380px){
   .cards{grid-template-columns:1fr}
@@ -155,10 +165,19 @@ tr:hover td{background:#fafbfc}
   <h2>Операции</h2><div class="h-sub" id="opcount">—</div>
   <div class="tbl-wrap">
     <table>
-      <thead><tr><th>Дата</th><th>Банк</th><th>Тип</th><th>Категория</th><th>Описание</th><th class="r">Сумма</th></tr></thead>
+      <thead><tr><th>Дата</th><th>Банк</th><th>Тип</th><th>Категория</th><th>Описание</th><th class="r">Сумма</th><th></th></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
   </div>
+</div>
+
+<div class="card pad" id="debtsCard">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div><h2>Долги</h2><div class="h-sub">займы вне трат — кто кому должен</div></div>
+    <button class="btn primary" onclick="openDebt()">+ Долг вручную</button>
+  </div>
+  <div class="debt-cards" id="debtSummary"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px" id="debtCols"></div>
 </div>
 
 <div class="foot" style="margin-top:18px"><b>Старт:</b> нажми «Войти через Google» — данные подтянутся с твоего Диска. Или просто загрузи выписки локально.<br><b>Выписки:</b> жми «Загрузить выписку» и кидай CSV (Т-Банк), XLSX (Альфа) или PDF (Яндекс) — конвертер сам распознает формат, схлопнет переводы между своими счетами и добавит операции (дубли отсеиваются).<br><br>
@@ -186,12 +205,33 @@ tr:hover td{background:#fafbfc}
   </div>
 </div>
 
+<div class="modal" id="debtModal">
+  <div class="modal-box">
+    <h3>Новый долг</h3>
+    <div class="field"><label>Направление</label><select id="dDir">
+      <option value="borrowed">Я занял (я должен)</option>
+      <option value="lent">Я дал в долг (мне должны)</option>
+    </select></div>
+    <div class="field"><label>Кто</label><input type="text" id="dWho" placeholder="напр. Максим"></div>
+    <div class="field"><label>Сумма (₽)</label><input type="number" id="dAmt" step="0.01" placeholder="1500"></div>
+    <div class="field"><label>Дата</label><input type="date" id="dDate"></div>
+    <div class="field"><label>Комментарий</label><input type="text" id="dNote" placeholder="за что / детали (необязательно)"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn primary" onclick="addDebt()">Сохранить</button>
+      <button class="btn" onclick="closeDebt()">Отмена</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SEED = [];
 const KEY='finance_light_v1';
+const DEBTKEY='finance_debts_v1';
 let DATA=load();
+let DEBTS=loadDebts();
 function load(){try{const s=localStorage.getItem(KEY);if(s)return JSON.parse(s);}catch(e){}return SEED.slice();}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(DATA));}catch(e){} if(typeof gToken!=="undefined"&&gToken){driveSave();}}
+function loadDebts(){try{const s=localStorage.getItem(DEBTKEY);if(s)return JSON.parse(s);}catch(e){}return [];}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(DATA));localStorage.setItem(DEBTKEY,JSON.stringify(DEBTS));}catch(e){} if(typeof gToken!=="undefined"&&gToken){driveSave();}}
 
 const RUB=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(Math.round(n))+' ₽';
 const TYPE_LABEL={expense:'Расход',income:'Доход',transfer:'Перевод',self:'Между своими',cash:'Наличные'};
@@ -216,8 +256,9 @@ function filtered(){
     if(s&&!(d.desc||'').toLowerCase().includes(s))return false; return true;
   });
 }
-const isSpend=d=>(d.type==='expense'||d.type==='transfer'||d.type==='cash')&&d.amount<0;
-const isInc=d=>(d.type==='income'||d.type==='transfer')&&d.amount>0;
+const isSpend=d=>!d.debt&&(d.type==='expense'||d.type==='transfer'||d.type==='cash')&&d.amount<0;
+const isInc=d=>!d.debt&&(d.type==='income'||d.type==='transfer')&&d.amount>0;
+function opId(d){return d.id||(d.id=(d.date+'|'+d.bank+'|'+d.amount+'|'+(d.desc||'').slice(0,24)));}
 
 function render(){
   const rows=filtered();
@@ -229,7 +270,7 @@ function render(){
     <div class="card stat" style="--c:var(--green)"><div class="lbl">Доходы</div><div class="val" style="color:var(--green)">${RUB(income)}</div><div class="meta">поступления</div></div>
     <div class="card stat" style="--c:var(--accent)"><div class="lbl">Баланс</div><div class="val" style="color:${net<0?'var(--red)':'var(--ink)'}">${RUB(net)}</div><div class="meta">доходы − расходы</div></div>
     <div class="card stat" style="--c:var(--vio)"><div class="lbl">Операций</div><div class="val">${rows.length}</div><div class="meta">${banksUsed} ${banksUsed===1?'банк':'банка'}</div></div>`;
-  drawCat(rows);drawBank(rows);drawMonth();drawIE(rows);drawTable(rows);
+  drawCat(rows);drawBank(rows);drawMonth();drawIE(rows);drawTable(rows);drawDebts();
   const months=uniq(DATA.map(d=>d.month)).sort();
   document.getElementById('period').textContent=months.length?`${months[0]} — ${months[months.length-1]} · ${DATA.length} операций`:'нет данных';
   document.getElementById('opcount').textContent=`показано ${rows.length} из ${DATA.length}`;
@@ -269,7 +310,65 @@ function drawIE(rows){
 }
 function drawTable(rows){
   const s=rows.slice().sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
-  document.getElementById('tbody').innerHTML=s.map(d=>`<tr><td>${d.date}</td><td><span class="bankpill">${d.bank}</span></td><td><span class="tag ${d.type}">${TYPE_LABEL[d.type]}</span></td><td>${esc(d.category||'—')}</td><td>${esc(d.desc||'')}</td><td class="amt ${d.amount<0?'neg':'pos'}">${RUB(d.amount)}</td></tr>`).join('');
+  document.getElementById('tbody').innerHTML=s.map(d=>{
+    const id=opId(d);
+    const debtBadge=d.debt?`<span class="tag ${d.debt==='borrowed'?'transfer':'income'}" title="помечено как долг">${d.debt==='borrowed'?'Я занял':'Я дал'}</span>`:'';
+    const btn=`<button class="mini" onclick="markDebt('${encodeURIComponent(id)}')">${d.debt?'↺':'долг'}</button>`;
+    return `<tr><td>${d.date}</td><td><span class="bankpill">${d.bank}</span></td><td><span class="tag ${d.type}">${TYPE_LABEL[d.type]}</span> ${debtBadge}</td><td>${esc(d.category||'—')}</td><td>${esc(d.desc||'')}</td><td class="amt ${d.amount<0?'neg':'pos'}">${RUB(d.amount)}</td><td>${btn}</td></tr>`;
+  }).join('');
+}
+// ===== DEBTS =====
+function markDebt(encId){
+  const id=decodeURIComponent(encId);
+  const d=DATA.find(x=>opId(x)===id); if(!d)return;
+  if(d.debt){ d.debt=null; save(); render(); return; } // un-mark
+  // direction guessed from amount: incoming => borrowed (тебе дали), outgoing => lent (ты дал)
+  const dir = d.amount>0?'borrowed':'lent';
+  d.debt=dir;
+  // create linked debt record
+  DEBTS.push({id:'D'+Date.now()+Math.random().toString(36).slice(2,6),dir,who:(d.desc||'').slice(0,40),amount:Math.abs(d.amount),date:d.date,note:'из выписки',closed:false,opId:id});
+  save(); render();
+}
+function openDebt(){document.getElementById('dDate').value=new Date().toISOString().slice(0,10);document.getElementById('debtModal').classList.add('show');}
+function closeDebt(){document.getElementById('debtModal').classList.remove('show');}
+function addDebt(){
+  const amt=parseFloat(document.getElementById('dAmt').value);
+  const who=document.getElementById('dWho').value.trim();
+  if(!who){alert('Укажи, кто');return;}
+  if(isNaN(amt)||amt<=0){alert('Укажи сумму');return;}
+  DEBTS.push({id:'D'+Date.now()+Math.random().toString(36).slice(2,6),dir:document.getElementById('dDir').value,who,amount:Math.abs(amt),date:document.getElementById('dDate').value,note:document.getElementById('dNote').value.trim(),closed:false,opId:null});
+  save(); render(); closeDebt();
+  document.getElementById('dWho').value='';document.getElementById('dAmt').value='';document.getElementById('dNote').value='';
+}
+function toggleDebt(id){
+  const d=DEBTS.find(x=>x.id===id); if(!d)return;
+  d.closed=!d.closed; save(); render();
+}
+function delDebt(id){
+  const d=DEBTS.find(x=>x.id===id); if(!d)return;
+  // if linked to an operation, also un-mark it
+  if(d.opId){ const op=DATA.find(x=>opId(x)===d.opId); if(op)op.debt=null; }
+  DEBTS=DEBTS.filter(x=>x.id!==id); save(); render();
+}
+function drawDebts(){
+  const borrowed=DEBTS.filter(d=>d.dir==='borrowed');
+  const lent=DEBTS.filter(d=>d.dir==='lent');
+  const oweOpen=borrowed.filter(d=>!d.closed).reduce((a,d)=>a+d.amount,0);
+  const dueOpen=lent.filter(d=>!d.closed).reduce((a,d)=>a+d.amount,0);
+  const net=dueOpen-oweOpen;
+  document.getElementById('debtSummary').innerHTML=`
+    <div class="card stat" style="--c:var(--red)"><div class="lbl">Я должен</div><div class="val" style="color:var(--red)">${RUB(oweOpen)}</div><div class="meta">${borrowed.filter(d=>!d.closed).length} активных</div></div>
+    <div class="card stat" style="--c:var(--green)"><div class="lbl">Мне должны</div><div class="val" style="color:var(--green)">${RUB(dueOpen)}</div><div class="meta">${lent.filter(d=>!d.closed).length} активных</div></div>
+    <div class="card stat" style="--c:var(--accent)"><div class="lbl">Чистый долг</div><div class="val" style="color:${net<0?'var(--red)':'var(--ink)'}">${RUB(net)}</div><div class="meta">мне должны − я должен</div></div>`;
+  const renderCol=(arr,title,empty)=>{
+    const sorted=arr.slice().sort((a,b)=>(a.closed-b.closed)||b.date.localeCompare(a.date));
+    const items=sorted.map(d=>`<div class="debt-item ${d.closed?'closed':''}">
+        <div><div class="who">${esc(d.who)} · ${RUB(d.amount)}</div><div class="det">${d.date}${d.note?' · '+esc(d.note):''}</div></div>
+        <div style="display:flex;gap:6px"><button class="mini" onclick="toggleDebt('${d.id}')">${d.closed?'вернуть':'закрыть'}</button><button class="mini" onclick="delDebt('${d.id}')">✕</button></div>
+      </div>`).join('');
+    return `<div class="debt-col"><h3>${title}</h3>${items||('<div class="det" style="color:var(--mut)">'+empty+'</div>')}</div>`;
+  };
+  document.getElementById('debtCols').innerHTML=renderCol(borrowed,'Я должен','пока пусто')+renderCol(lent,'Мне должны','пока пусто');
 }
 function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
@@ -278,8 +377,8 @@ function closeAdd(){document.getElementById('addModal').classList.remove('show')
 function addOp(){const date=aDate.value;if(!date){alert('Укажи дату');return;}const amt=parseFloat(aAmt.value);if(isNaN(amt)){alert('Укажи сумму');return;}
   DATA.push({date,time:'00:00:00',month:date.slice(0,7),bank:aBank.value,amount:Math.round(amt*100)/100,category:aCat.value.trim(),desc:aDesc.value.trim(),mcc:'',card:'',type:aType.value});
   save();initFilters();render();closeAdd();aCat.value='';aDesc.value='';aAmt.value='';}
-function exportData(){const blob=new Blob([JSON.stringify(DATA,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finance_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
-function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(Array.isArray(d)){DATA=d;save();initFilters();render();alert('Загружено: '+d.length+' операций');}else alert('Неверный формат');}catch(err){alert('Ошибка чтения файла');}};r.readAsText(f);e.target.value='';}
+function exportData(){const blob=new Blob([JSON.stringify({data:DATA,debts:DEBTS},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finance_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(Array.isArray(d)){DATA=d;}else if(d&&Array.isArray(d.data)){DATA=d.data;if(Array.isArray(d.debts))DEBTS=d.debts;}else{alert('Неверный формат');return;}save();initFilters();render();alert('Загружено: '+DATA.length+' операций');}catch(err){alert('Ошибка чтения файла');}};r.readAsText(f);e.target.value='';}
 
 
 
@@ -314,7 +413,7 @@ async function driveLoad(){
     if(!gFileId){ await driveSave(); return; } // first time: create from current
     const r=await fetch(`https://www.googleapis.com/drive/v3/files/${gFileId}?alt=media`,{headers:{Authorization:'Bearer '+gToken}});
     const j=await r.json();
-    if(Array.isArray(j)){ DATA=j; } else if(j&&Array.isArray(j.data)){ DATA=j.data; }
+    if(Array.isArray(j)){ DATA=j; } else if(j&&Array.isArray(j.data)){ DATA=j.data; if(Array.isArray(j.debts))DEBTS=j.debts; }
     save(); initFilters(); render();
     setSync('загружено из Google Drive');
   }catch(e){ setSync('ошибка загрузки'); }
@@ -323,7 +422,7 @@ async function driveSave(){
   if(!gToken)return;
   try{
     const meta={name:DRIVE_FILENAME,mimeType:'application/json'};
-    const body=JSON.stringify(DATA);
+    const body=JSON.stringify({data:DATA,debts:DEBTS});
     if(!gFileId){
       // create
       const form=new FormData();
