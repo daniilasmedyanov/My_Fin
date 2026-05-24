@@ -171,7 +171,7 @@ tr:hover td{background:#fafbfc}
   </div>
 </div>
 
-<div class="card pad" id="debtsCard">
+<div class="card pad" id="debtsCard" style="margin-top:14px">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div><h2>Долги</h2><div class="h-sub">займы вне трат — кто кому должен</div></div>
     <button class="btn primary" onclick="openDebt()">+ Долг вручную</button>
@@ -321,7 +321,7 @@ function drawTable(rows){
 function markDebt(encId){
   const id=decodeURIComponent(encId);
   const d=DATA.find(x=>opId(x)===id); if(!d)return;
-  if(d.debt){ d.debt=null; save(); render(); return; } // un-mark
+  if(d.debt){ d.debt=null; DEBTS=DEBTS.filter(x=>x.opId!==id); save(); render(); return; } // un-mark: also drop linked debt
   // direction guessed from amount: incoming => borrowed (тебе дали), outgoing => lent (ты дал)
   const dir = d.amount>0?'borrowed':'lent';
   d.debt=dir;
@@ -351,6 +351,10 @@ function delDebt(id){
   DEBTS=DEBTS.filter(x=>x.id!==id); save(); render();
 }
 function drawDebts(){
+  // reconcile: drop ledger-linked debts whose operation is no longer marked
+  const before=DEBTS.length;
+  DEBTS=DEBTS.filter(d=>{ if(!d.opId)return true; const op=DATA.find(x=>opId(x)===d.opId); return op&&op.debt; });
+  if(DEBTS.length!==before){ try{localStorage.setItem(DEBTKEY,JSON.stringify(DEBTS));}catch(e){} }
   const borrowed=DEBTS.filter(d=>d.dir==='borrowed');
   const lent=DEBTS.filter(d=>d.dir==='lent');
   const oweOpen=borrowed.filter(d=>!d.closed).reduce((a,d)=>a+d.amount,0);
