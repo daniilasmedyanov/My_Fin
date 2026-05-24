@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Личные финансы</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+:root{
+  --bg:#f3f4f6; --panel:#ffffff; --ink:#0f172a; --ink2:#1e293b; --mut:#94a3b8; --mut2:#64748b;
+  --line:#e9edf2; --line2:#f1f5f9; --accent:#1d4ed8;
+  --green:#16a34a; --red:#dc2626; --amber:#f59e0b; --vio:#8b5cf6;
+  --shadow:0 1px 3px rgba(15,23,42,.04),0 1px 2px rgba(15,23,42,.03);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Manrope',sans-serif;font-size:14px;padding:22px 20px 50px}
+.wrap{max-width:1240px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;margin-bottom:20px;padding:0 2px}
+h1{font-size:26px;font-weight:800;letter-spacing:-.6px}
+h1 span{color:var(--accent)}
+.sub{color:var(--mut2);font-size:13px;margin-top:4px;display:flex;align-items:center;gap:7px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font-family:'Manrope';cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink2);padding:9px 14px;border-radius:10px;font-size:13px;font-weight:700;box-shadow:var(--shadow);transition:.15s}
+.btn:hover{border-color:var(--mut)}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.07)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+select,input[type=text]{font-family:'Manrope';background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;font-weight:600}
+select:focus,input:focus{outline:none;border-color:var(--accent)}
+.toggle{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--mut2);font-weight:600;margin-left:auto}
+.switch{position:relative;width:42px;height:23px}
+.switch input{display:none}
+.slider{position:absolute;inset:0;background:#d6dbe3;border-radius:20px;transition:.2s;cursor:pointer}
+.slider:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch input:checked+.slider{background:var(--accent)}
+.switch input:checked+.slider:before{transform:translateX(19px)}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow)}
+.stat{padding:18px 20px;position:relative;overflow:hidden}
+.stat:before{content:"";position:absolute;top:16px;left:0;width:4px;height:30px;border-radius:0 4px 4px 0;background:var(--c,var(--accent))}
+.stat .lbl{color:var(--mut);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding-left:10px}
+.stat .val{font-size:27px;font-weight:800;margin-top:7px;letter-spacing:-.8px;padding-left:10px}
+.stat .meta{font-size:12px;color:var(--mut2);margin-top:3px;font-weight:500;padding-left:10px}
+.grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;margin-bottom:14px}
+.grid2b{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.pad{padding:18px 20px}
+.pad h2{font-size:15px;font-weight:800;margin-bottom:4px;letter-spacing:-.2px}
+.pad .h-sub{font-size:12px;color:var(--mut);font-weight:500;margin-bottom:12px}
+.chart-box{position:relative;height:280px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:9px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
+th.r{text-align:right}
+td{padding:10px;border-bottom:1px solid var(--line2)}
+tr:hover td{background:#fafbfc}
+.amt{text-align:right;font-variant-numeric:tabular-nums;font-weight:700}
+.amt.neg{color:var(--red)} .amt.pos{color:var(--green)}
+.tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.tag.expense{background:#fef2f2;color:var(--red)}
+.tag.income{background:#f0fdf4;color:var(--green)}
+.tag.transfer{background:#fffbeb;color:#b45309}
+.tag.self{background:#eff6ff;color:var(--accent)}
+.tag.cash{background:#f5f3ff;color:var(--vio)}
+.bankpill{display:inline-block;padding:2px 9px;border-radius:7px;font-size:11px;font-weight:700;background:var(--line2);color:var(--ink2)}
+.tbl-wrap{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.modal{position:fixed;inset:0;background:rgba(15,23,42,.4);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal.show{display:flex}
+.modal-box{background:#fff;border-radius:18px;padding:24px;width:100%;max-width:430px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-box h3{font-size:18px;font-weight:800;margin-bottom:16px}
+.field{margin-bottom:11px}
+.field label{display:block;font-size:12px;color:var(--mut2);margin-bottom:5px;font-weight:600}
+.field input,.field select{width:100%}
+.foot{color:var(--mut);font-size:12px;text-align:center;margin-top:26px;line-height:1.7}
+@media(max-width:920px){.cards{grid-template-columns:repeat(2,1fr)}.grid2,.grid2b{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Личные <span>финансы</span></h1>
+    <div class="sub"><span class="dot"></span><span id="period">—</span> <span id="syncStatus" style="color:var(--mut);margin-left:6px"></span></div>
+  </div>
+  <div class="btns">
+    <button class="btn primary" onclick="document.getElementById('stmtFile').click()">📥 Загрузить выписку</button>
+    <input type="file" id="stmtFile" accept=".csv,.xlsx,.xls,.pdf" multiple style="display:none" onchange="handleFiles(this.files);this.value=''">
+    <button class="btn" onclick="openAdd()">+ Операция</button>
+    <button class="btn" onclick="exportData()">⬇ Бэкап</button>
+    <button class="btn" onclick="document.getElementById('imp').click()">⬆ Загрузить</button>
+    <button class="btn" id="gBtn" onclick="gSignIn()">Войти через Google</button>
+    <input type="file" id="imp" accept=".json" style="display:none" onchange="importData(event)">
+  </div>
+</header>
+
+<div class="filters">
+  <select id="fBank" onchange="render()"><option value="">Все банки</option></select>
+  <select id="fMonth" onchange="render()"><option value="">Все месяцы</option></select>
+  <select id="fCat" onchange="render()"><option value="">Все категории</option></select>
+  <input type="text" id="fSearch" placeholder="Поиск по описанию…" oninput="render()" style="flex:1;min-width:150px">
+  <div class="toggle">Переводы между своими
+    <label class="switch"><input type="checkbox" id="fSelf" onchange="render()"><span class="slider"></span></label>
+  </div>
+</div>
+
+<div class="cards" id="cards"></div>
+
+<div class="grid2">
+  <div class="card pad"><h2>Траты по категориям</h2><div class="h-sub">на что уходят деньги</div><div class="chart-box"><canvas id="catChart"></canvas></div></div>
+  <div class="card pad"><h2>По банкам</h2><div class="h-sub">расходы и доходы по счетам</div><div class="chart-box"><canvas id="bankChart"></canvas></div></div>
+</div>
+<div class="grid2b">
+  <div class="card pad"><h2>Динамика по месяцам</h2><div class="h-sub">доходы и расходы во времени</div><div class="chart-box"><canvas id="monthChart"></canvas></div></div>
+  <div class="card pad"><h2>Доходы vs Расходы</h2><div class="h-sub">баланс за выбранный период</div><div class="chart-box"><canvas id="ieChart"></canvas></div></div>
+</div>
+
+<div class="card pad">
+  <h2>Операции</h2><div class="h-sub" id="opcount">—</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Дата</th><th>Банк</th><th>Тип</th><th>Категория</th><th>Описание</th><th class="r">Сумма</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="foot" style="margin-top:18px"><b>Старт:</b> нажми «Войти через Google» — данные подтянутся с твоего Диска. Или просто загрузи выписки локально.<br><b>Выписки:</b> жми «Загрузить выписку» и кидай CSV (Т-Банк), XLSX (Альфа) или PDF (Яндекс) — конвертер сам распознает формат, схлопнет переводы между своими счетами и добавит операции (дубли отсеиваются).<br><br>
+  Данные хранятся локально в этом браузере и никуда не отправляются.<br>
+  Делай бэкап кнопкой «Бэкап» — файл можно «Загрузить» обратно на другом устройстве.
+</div>
+</div>
+
+<div class="modal" id="addModal">
+  <div class="modal-box">
+    <h3>Новая операция</h3>
+    <div class="field"><label>Дата</label><input type="date" id="aDate"></div>
+    <div class="field"><label>Банк</label><select id="aBank"><option>Т-Банк</option><option>Яндекс</option><option>Альфа</option></select></div>
+    <div class="field"><label>Тип</label><select id="aType">
+      <option value="expense">Расход</option><option value="income">Доход</option>
+      <option value="transfer">Перевод людям</option><option value="self">Между своими</option><option value="cash">Наличные</option>
+    </select></div>
+    <div class="field"><label>Категория</label><input type="text" id="aCat" placeholder="напр. Супермаркеты"></div>
+    <div class="field"><label>Описание</label><input type="text" id="aDesc" placeholder="продавец / комментарий"></div>
+    <div class="field"><label>Сумма (₽) — отрицательная для трат</label><input type="number" id="aAmt" step="0.01" placeholder="-500"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn primary" onclick="addOp()">Сохранить</button>
+      <button class="btn" onclick="closeAdd()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SEED = [];
+const KEY='finance_light_v1';
+let DATA=load();
+function load(){try{const s=localStorage.getItem(KEY);if(s)return JSON.parse(s);}catch(e){}return SEED.slice();}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(DATA));}catch(e){} if(typeof gToken!=="undefined"&&gToken){driveSave();}}
+
+const RUB=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(Math.round(n))+' ₽';
+const TYPE_LABEL={expense:'Расход',income:'Доход',transfer:'Перевод',self:'Между своими',cash:'Наличные'};
+const PALETTE=['#1d4ed8','#16a34a','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#ef4444','#84cc16','#0ea5e9','#a855f7','#eab308','#22c55e','#f43f5e','#14b8a6','#d946ef','#fb923c'];
+const BANK_CLR={'Т-Банк':'#facc15','Яндекс':'#ef4444','Альфа':'#1d4ed8'};
+const uniq=a=>[...new Set(a)];
+let charts={};
+const gridClr='#f1f5f9', tickClr='#94a3b8', tickFont={family:'Manrope',weight:'600',size:11};
+
+function initFilters(){
+  fill('fBank',uniq(DATA.map(d=>d.bank)).sort());
+  fill('fMonth',uniq(DATA.map(d=>d.month)).sort().reverse());
+  fill('fCat',uniq(DATA.map(d=>d.category)).filter(Boolean).sort());
+}
+function fill(id,items){const el=document.getElementById(id),cur=el.value;el.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());items.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;el.appendChild(o);});if(items.includes(cur))el.value=cur;}
+
+function filtered(){
+  const b=fBank.value,m=fMonth.value,c=fCat.value,s=fSearch.value.trim().toLowerCase(),showSelf=fSelf.checked;
+  return DATA.filter(d=>{
+    if(!showSelf&&d.type==='self')return false;
+    if(b&&d.bank!==b)return false; if(m&&d.month!==m)return false; if(c&&d.category!==c)return false;
+    if(s&&!(d.desc||'').toLowerCase().includes(s))return false; return true;
+  });
+}
+const isSpend=d=>(d.type==='expense'||d.type==='transfer'||d.type==='cash')&&d.amount<0;
+const isInc=d=>(d.type==='income'||d.type==='transfer')&&d.amount>0;
+
+function render(){
+  const rows=filtered();
+  const spend=rows.filter(isSpend).reduce((a,d)=>a-d.amount,0);
+  const income=rows.filter(isInc).reduce((a,d)=>a+d.amount,0);
+  const net=income-spend; const banksUsed=uniq(rows.map(d=>d.bank)).length;
+  document.getElementById('cards').innerHTML=`
+    <div class="card stat" style="--c:var(--red)"><div class="lbl">Расходы</div><div class="val" style="color:var(--red)">${RUB(spend)}</div><div class="meta">включая переводы людям</div></div>
+    <div class="card stat" style="--c:var(--green)"><div class="lbl">Доходы</div><div class="val" style="color:var(--green)">${RUB(income)}</div><div class="meta">поступления</div></div>
+    <div class="card stat" style="--c:var(--accent)"><div class="lbl">Баланс</div><div class="val" style="color:${net<0?'var(--red)':'var(--ink)'}">${RUB(net)}</div><div class="meta">доходы − расходы</div></div>
+    <div class="card stat" style="--c:var(--vio)"><div class="lbl">Операций</div><div class="val">${rows.length}</div><div class="meta">${banksUsed} ${banksUsed===1?'банк':'банка'}</div></div>`;
+  drawCat(rows);drawBank(rows);drawMonth();drawIE(rows);drawTable(rows);
+  const months=uniq(DATA.map(d=>d.month)).sort();
+  document.getElementById('period').textContent=months.length?`${months[0]} — ${months[months.length-1]} · ${DATA.length} операций`:'нет данных';
+  document.getElementById('opcount').textContent=`показано ${rows.length} из ${DATA.length}`;
+}
+function aggBy(rows,key,fn,sign){const m={};rows.filter(fn).forEach(d=>{const k=d[key]||'—';m[k]=(m[k]||0)+sign(d);});return Object.entries(m).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);}
+function mk(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(document.getElementById(id),cfg);}
+
+function drawCat(rows){
+  const e=aggBy(rows,'category',isSpend,d=>-d.amount);
+  mk('catChart',{type:'doughnut',data:{labels:e.map(x=>x[0]),datasets:[{data:e.map(x=>x[1]),backgroundColor:PALETTE,borderColor:'#fff',borderWidth:2}]},
+    options:{maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{color:'#64748b',font:{family:'Manrope',size:11,weight:'600'},boxWidth:10,padding:8}},tooltip:{callbacks:{label:c=>` ${c.label}: ${RUB(c.parsed)}`}}}}});
+}
+function drawBank(rows){
+  const banks=uniq(DATA.map(d=>d.bank));
+  const sp=banks.map(b=>rows.filter(d=>d.bank===b&&isSpend(d)).reduce((a,d)=>a-d.amount,0));
+  const ic=banks.map(b=>rows.filter(d=>d.bank===b&&isInc(d)).reduce((a,d)=>a+d.amount,0));
+  mk('bankChart',{type:'bar',data:{labels:banks,datasets:[{label:'Расходы',data:sp,backgroundColor:'#f87171',borderRadius:7},{label:'Доходы',data:ic,backgroundColor:'#4ade80',borderRadius:7}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#64748b',font:tickFont,boxWidth:12}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${RUB(c.parsed.y)}`}}},
+      scales:{x:{grid:{display:false},ticks:{color:tickClr,font:tickFont}},y:{grid:{color:gridClr},border:{display:false},ticks:{color:tickClr,font:tickFont,callback:v=>RUB(v)}}}}});
+}
+function drawMonth(){
+  const showSelf=fSelf.checked, base=DATA.filter(d=>showSelf||d.type!=='self');
+  const months=uniq(base.map(d=>d.month)).sort();
+  const sp=months.map(m=>base.filter(d=>d.month===m&&isSpend(d)).reduce((a,d)=>a-d.amount,0));
+  const ic=months.map(m=>base.filter(d=>d.month===m&&isInc(d)).reduce((a,d)=>a+d.amount,0));
+  mk('monthChart',{type:'line',data:{labels:months,datasets:[
+    {label:'Расходы',data:sp,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.08)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#ef4444'},
+    {label:'Доходы',data:ic,borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.08)',fill:true,tension:.35,pointRadius:4,pointBackgroundColor:'#16a34a'}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{labels:{color:'#64748b',font:tickFont,boxWidth:12}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${RUB(c.parsed.y)}`}}},
+      scales:{x:{grid:{display:false},ticks:{color:tickClr,font:tickFont}},y:{grid:{color:gridClr},border:{display:false},ticks:{color:tickClr,font:tickFont,callback:v=>RUB(v)}}}}});
+}
+function drawIE(rows){
+  const sp=rows.filter(isSpend).reduce((a,d)=>a-d.amount,0), ic=rows.filter(isInc).reduce((a,d)=>a+d.amount,0);
+  mk('ieChart',{type:'bar',data:{labels:['Доходы','Расходы'],datasets:[{data:[ic,sp],backgroundColor:['#4ade80','#f87171'],borderRadius:10,barThickness:70}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${RUB(c.parsed.x)}`}}},
+      scales:{x:{grid:{color:gridClr},border:{display:false},ticks:{color:tickClr,font:tickFont,callback:v=>RUB(v)}},y:{grid:{display:false},ticks:{color:'#0f172a',font:{family:'Manrope',weight:'700',size:13}}}}}});
+}
+function drawTable(rows){
+  const s=rows.slice().sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  document.getElementById('tbody').innerHTML=s.map(d=>`<tr><td>${d.date}</td><td><span class="bankpill">${d.bank}</span></td><td><span class="tag ${d.type}">${TYPE_LABEL[d.type]}</span></td><td>${esc(d.category||'—')}</td><td>${esc(d.desc||'')}</td><td class="amt ${d.amount<0?'neg':'pos'}">${RUB(d.amount)}</td></tr>`).join('');
+}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function openAdd(){document.getElementById('aDate').value=new Date().toISOString().slice(0,10);document.getElementById('addModal').classList.add('show');}
+function closeAdd(){document.getElementById('addModal').classList.remove('show');}
+function addOp(){const date=aDate.value;if(!date){alert('Укажи дату');return;}const amt=parseFloat(aAmt.value);if(isNaN(amt)){alert('Укажи сумму');return;}
+  DATA.push({date,time:'00:00:00',month:date.slice(0,7),bank:aBank.value,amount:Math.round(amt*100)/100,category:aCat.value.trim(),desc:aDesc.value.trim(),mcc:'',card:'',type:aType.value});
+  save();initFilters();render();closeAdd();aCat.value='';aDesc.value='';aAmt.value='';}
+function exportData(){const blob=new Blob([JSON.stringify(DATA,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='finance_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();}
+function importData(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(Array.isArray(d)){DATA=d;save();initFilters();render();alert('Загружено: '+d.length+' операций');}else alert('Неверный формат');}catch(err){alert('Ошибка чтения файла');}};r.readAsText(f);e.target.value='';}
+
+
+
+// ===== GOOGLE DRIVE SYNC (настрой свой Client ID ниже) =====
+const GOOGLE_CLIENT_ID = ''; // <-- ВПИШИ сюда свой OAuth Client ID из Google Cloud Console
+const DRIVE_FILENAME = 'finance_dashboard_data.json';
+let gToken=null, gFileId=null, tokenClient=null;
+
+function gReady(){ return GOOGLE_CLIENT_ID && typeof google!=='undefined' && google.accounts; }
+function initGoogle(){
+  const btn=document.getElementById('gBtn');
+  if(!GOOGLE_CLIENT_ID){ btn.textContent='Google: впиши Client ID'; btn.disabled=true; btn.style.opacity=.6; return; }
+  try{
+    tokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:GOOGLE_CLIENT_ID,
+      scope:'https://www.googleapis.com/auth/drive.file',
+      callback:async (resp)=>{ if(resp.access_token){ gToken=resp.access_token; btn.textContent='✓ Google подключён'; await driveLoad(); } }
+    });
+    btn.disabled=false;
+  }catch(e){ btn.textContent='Google: ошибка init'; }
+}
+function gSignIn(){ if(!gReady()){alert('Сначала впиши GOOGLE_CLIENT_ID в коде и проверь, что страница открыта по https');return;} tokenClient.requestAccessToken({prompt:gToken?'':'consent'}); }
+
+async function driveFindFile(){
+  const q=encodeURIComponent(`name='${DRIVE_FILENAME}' and trashed=false`);
+  const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`,{headers:{Authorization:'Bearer '+gToken}});
+  const j=await r.json(); return (j.files&&j.files[0])?j.files[0].id:null;
+}
+async function driveLoad(){
+  try{
+    gFileId=await driveFindFile();
+    if(!gFileId){ await driveSave(); return; } // first time: create from current
+    const r=await fetch(`https://www.googleapis.com/drive/v3/files/${gFileId}?alt=media`,{headers:{Authorization:'Bearer '+gToken}});
+    const j=await r.json();
+    if(Array.isArray(j)){ DATA=j; } else if(j&&Array.isArray(j.data)){ DATA=j.data; }
+    save(); initFilters(); render();
+    setSync('загружено из Google Drive');
+  }catch(e){ setSync('ошибка загрузки'); }
+}
+async function driveSave(){
+  if(!gToken)return;
+  try{
+    const meta={name:DRIVE_FILENAME,mimeType:'application/json'};
+    const body=JSON.stringify(DATA);
+    if(!gFileId){
+      // create
+      const form=new FormData();
+      form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+      form.append('file',new Blob([body],{type:'application/json'}));
+      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{method:'POST',headers:{Authorization:'Bearer '+gToken},body:form});
+      const j=await r.json(); gFileId=j.id;
+    }else{
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${gFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+gToken,'Content-Type':'application/json'},body});
+    }
+    setSync('сохранено в Google Drive '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){ setSync('ошибка сохранения'); }
+}
+function setSync(t){ const el=document.getElementById('syncStatus'); if(el)el.textContent=t; }
+
+// ===== BANK STATEMENT PARSERS =====
+const SELF_PHONES=['993) 721-16-10','993 721-16-10','79937211610','904) 113-07-83','904 113-07-83','79041130783'];
+function isSelfPhone(desc){const d=(desc||'').replace(/\u00a0/g,' ');return SELF_PHONES.some(p=>d.includes(p));}
+function num(s){return parseFloat(String(s).replace(/\u00a0/g,'').replace(/\s/g,'').replace(',','.'))||0;}
+function ddmmyyyy(s){const m=String(s).trim().match(/(\d{2})\.(\d{2})\.(\d{4})/);return m?`${m[3]}-${m[2]}-${m[1]}`:null;}
+
+// ---- T-Bank CSV ----
+function parseTbankCSV(text){
+  const lines=text.split(/\r?\n/).filter(l=>l.trim());
+  const rows=lines.map(l=>l.split(';').map(c=>c.replace(/^"|"$/g,'')));
+  const out=[]; 
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]; if(!r[0])continue;
+    if((r[3]||'').trim()!=='OK')continue;
+    const date=ddmmyyyy(r[0].split(' ')[0]); if(!date)continue;
+    const time=r[0].split(' ')[1]||'00:00:00';
+    const amt=num(r[4]); const cat=(r[9]||'').trim(); const desc=(r[11]||'').trim();
+    let typ;
+    const dl=desc.toLowerCase();
+    if(dl.startsWith('между своими')||dl.includes('даниил')) typ='self';
+    else if(cat==='Наличные') typ='cash';
+    else if(cat==='Переводы') typ='transfer';
+    else typ=amt<0?'expense':'income';
+    out.push({date,time,month:date.slice(0,7),bank:'Т-Банк',amount:Math.round(amt*100)/100,category:cat,desc,mcc:(r[10]||'').trim(),card:(r[2]||'').trim(),type:typ});
+  }
+  return out;
+}
+
+// ---- Alfa XLSX (needs SheetJS) ----
+function parseAlfaXLSX(workbook){
+  const sh=workbook.Sheets[workbook.SheetNames[0]];
+  const arr=XLSX.utils.sheet_to_json(sh,{header:1,raw:false,defval:''});
+  let hrow=-1;
+  for(let i=0;i<arr.length;i++){ if(String(arr[i][0]).trim()==='Дата операции'){hrow=i;break;} }
+  if(hrow<0)return [];
+  const out=[];
+  for(let i=hrow+1;i<arr.length;i++){
+    const r=arr[i]; const date=ddmmyyyy(r[0]); if(!date)continue;
+    if(!String(r[14]||'').trim().toLowerCase().startsWith('выполн'))continue;
+    const amt=num(r[12]); const desc=String(r[11]||''); const dl=desc.toLowerCase();
+    let typ,cat;
+    const selfInt=dl.includes('внутрибанковский перевод между счет')||dl.includes('погашения несанкционированного перерасход');
+    const selfPh=dl.includes('перевод')&&isSelfPhone(desc);
+    if(selfInt||selfPh){typ='self';cat='Между своими';}
+    else if(dl.includes('заработная плата')){typ='income';cat='Зарплата';}
+    else if(dl.includes('возврат')){typ='income';cat='Возврат/кешбэк';}
+    else if(dl.includes('коммунальн')){typ='expense';cat='Коммуналка';}
+    else if(dl.includes('оплата через alfa pay')||(dl.includes('оплата')&&dl.includes('qr'))){typ=amt<0?'expense':'income';cat='Покупки';}
+    else if(dl.includes('перевод')){typ='transfer';cat='Переводы';}
+    else {typ=amt<0?'expense':'income';cat='Прочее';}
+    let short;
+    const mm=desc.match(/Получатель (.+)$/);
+    const m=desc.match(/(на|от) \+7[^.]*/);
+    if(dl.includes('внутрибанковский'))short='Между своими счетами Альфа';
+    else if(dl.includes('погашения'))short='Между своими (доп.счёт)';
+    else if(selfPh)short='Перевод на свой счёт';
+    else if(mm)short='Оплата: '+mm[1].trim();
+    else if(dl.includes('от клиента')){const nm=desc.match(/от клиента ([^.]+)/);short='Перевод от '+(nm?nm[1].trim():'?');}
+    else if(dl.includes('заработная плата'))short='Заработная плата';
+    else if(m)short='Перевод '+m[0].trim();
+    else short=desc.slice(0,80);
+    out.push({date,time:'00:00:00',month:date.slice(0,7),bank:'Альфа',amount:Math.round(amt*100)/100,category:cat,desc:short.slice(0,80),mcc:'',card:'',type:typ});
+  }
+  return out;
+}
+
+function dedupeMerge(existing, incoming){
+  const key=o=>`${o.date}|${o.bank}|${o.amount}|${(o.desc||'').slice(0,30)}`;
+  const seen=new Set(existing.map(key));
+  let added=0;
+  incoming.forEach(o=>{ if(!seen.has(key(o))){existing.push(o);seen.add(key(o));added++;} });
+  return added;
+}
+
+
+// ---- Yandex Bank PDF ----
+if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}
+async function parseYandexPDF(arrayBuffer){
+  const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  let lines=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const c=await page.getTextContent();
+    // group items into visual lines by their y-coordinate
+    const byY={};
+    c.items.forEach(it=>{ const y=Math.round(it.transform[5]); (byY[y]=byY[y]||[]).push(it); });
+    Object.keys(byY).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const ln=byY[y].sort((a,b)=>a.transform[4]-b.transform[4]).map(i=>i.str).join(' ').replace(/\s+/g,' ').trim();
+      if(ln)lines.push(ln);
+    });
+  }
+  const rx=/(\d{2}\.\d{2}\.\d{4}).*?(\d{2}\.\d{2}\.\d{4}).*?(\*\d+)?\s*([+\u2013\u2212-][\d\s.,]+)\s*₽\s*([+\u2013\u2212-][\d\s.,]+)\s*₽/;
+  const out=[];
+  for(let i=0;i<lines.length;i++){
+    const m=lines[i].match(rx); if(!m)continue;
+    let desc=lines[i].slice(0,m.index).trim();
+    // continuation: next line(s) without a date that extend the description (e.g. contract no.)
+    if(/№$|кредитом по договору$|договору$|клиента$|долга по$/.test(desc) && lines[i+1] && !/\d{2}\.\d{2}\.\d{4}/.test(lines[i+1])){ desc+=' '+lines[i+1].trim(); }
+    const date=m[1].split('.').reverse().join('-');
+    let raw=m[4].replace(/\s/g,'').replace('\u2013','-').replace('\u2212','-').replace(',','.');
+    const amt=parseFloat(raw); if(isNaN(amt))continue;
+    if(desc.length<3||desc.includes('Входящий остаток')||desc.includes('Описание операции'))continue;
+    const dl=desc.toLowerCase();
+    let typ,cat;
+    if(dl.includes('993 721-16-10')||dl.includes('904 113-07-83')||dl.includes('между счетами одного клиент')){typ='self';cat='Между своими';}
+    else if(dl.includes('погашение')){typ='expense';cat='Кредиты/займы';}
+    else if(dl.includes('оплата')){typ=amt<0?'expense':'income';cat='Покупки';}
+    else {typ=amt<0?'expense':'income';cat='Прочее';}
+    let short=desc;
+    if(dl.includes('между счетами'))short='Между своими счетами Яндекс';
+    else if(dl.includes('перевод сбп'))short='Перевод на свой счёт';
+    else if(/^оплата/i.test(desc))short=desc.replace(/^Оплата (товаров и услуг )?/i,'');
+    out.push({date,time:'00:00:00',month:date.slice(0,7),bank:'Яндекс',amount:Math.round(amt*100)/100,category:cat,desc:short.slice(0,80),mcc:'',card:'',type:typ});
+  }
+  return out;
+}
+
+function handleFiles(files){
+  const list=[...files]; let pending=list.length; let totalAdded=0; let report=[];
+  if(!pending)return;
+  list.forEach(file=>{
+    const ext=file.name.toLowerCase();
+    const reader=new FileReader();
+    reader.onload=e=>{
+      (async()=>{
+       try{
+        let parsed=[];
+        if(ext.endsWith('.csv')){ parsed=parseTbankCSV(e.target.result); }
+        else if(ext.endsWith('.xlsx')||ext.endsWith('.xls')){
+          const wb=XLSX.read(e.target.result,{type:'binary'}); parsed=parseAlfaXLSX(wb);
+        }
+        else if(ext.endsWith('.pdf')){ parsed=await parseYandexPDF(e.target.result); }
+        const added=dedupeMerge(DATA,parsed);
+        totalAdded+=added; report.push(`${file.name}: +${added} (распознано ${parsed.length})`);
+       }catch(err){ report.push(`${file.name}: ошибка — ${err.message}`); }
+       if(--pending===0){ save();initFilters();render(); alert('Импорт:\n'+report.join('\n')); }
+      })();
+    };
+    if(ext.endsWith('.csv')) reader.readAsText(file,'utf-8');
+    else if(ext.endsWith('.pdf')) reader.readAsArrayBuffer(file);
+    else reader.readAsBinaryString(file);
+  });
+}
+
+initFilters();render();
+setTimeout(initGoogle,800);
+</script>
+</body>
+</html>
