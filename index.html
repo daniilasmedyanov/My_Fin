@@ -52,6 +52,7 @@ select:focus,input:focus{outline:none;border-color:var(--accent)}
 .pad h2{font-size:15px;font-weight:800;margin-bottom:4px;letter-spacing:-.2px}
 .pad .h-sub{font-size:12px;color:var(--mut);font-weight:500;margin-bottom:12px}
 .chart-box{position:relative;height:280px}
+.chart-box canvas{max-width:100%!important}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;color:var(--mut);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:9px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);z-index:1}
 th.r{text-align:right}
@@ -76,6 +77,39 @@ tr:hover td{background:#fafbfc}
 .field input,.field select{width:100%}
 .foot{color:var(--mut);font-size:12px;text-align:center;margin-top:26px;line-height:1.7}
 @media(max-width:920px){.cards{grid-template-columns:repeat(2,1fr)}.grid2,.grid2b{grid-template-columns:1fr}}
+@media(max-width:600px){
+  html,body{max-width:100%;overflow-x:hidden}
+  body{padding:12px 10px 40px}
+  .wrap{max-width:100%}
+  .card{max-width:100%}
+  .chart-box{max-width:100%;overflow:hidden}
+  header{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:14px}
+  h1{font-size:22px}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btns .btn{width:100%;text-align:center;padding:12px 10px;font-size:13px}
+  .btns .btn.primary{grid-column:1 / -1}
+  #gBtn{grid-column:1 / -1}
+  .filters{flex-direction:column;align-items:stretch;gap:8px;padding:12px}
+  .filters select,.filters input[type=text]{width:100%}
+  .toggle{margin-left:0;justify-content:space-between;padding-top:4px;border-top:1px solid var(--line2)}
+  .cards{grid-template-columns:1fr 1fr;gap:10px}
+  .stat{padding:14px 14px}
+  .stat .val{font-size:21px}
+  .stat .lbl{font-size:10px}
+  .pad{padding:14px}
+  .chart-box{height:240px}
+  .pad h2{font-size:14px}
+  /* horizontal scroll ONLY inside the table wrapper */
+  .tbl-wrap{max-height:none;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{font-size:12px;min-width:540px}
+  th,td{padding:8px 7px}
+  .modal-box{padding:18px}
+  .foot{font-size:11px}
+}
+@media(max-width:380px){
+  .cards{grid-template-columns:1fr}
+  .btns{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -206,7 +240,7 @@ function mk(id,cfg){if(charts[id])charts[id].destroy();charts[id]=new Chart(docu
 function drawCat(rows){
   const e=aggBy(rows,'category',isSpend,d=>-d.amount);
   mk('catChart',{type:'doughnut',data:{labels:e.map(x=>x[0]),datasets:[{data:e.map(x=>x[1]),backgroundColor:PALETTE,borderColor:'#fff',borderWidth:2}]},
-    options:{maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{color:'#64748b',font:{family:'Manrope',size:11,weight:'600'},boxWidth:10,padding:8}},tooltip:{callbacks:{label:c=>` ${c.label}: ${RUB(c.parsed)}`}}}}});
+    options:{maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:(window.innerWidth<600?'bottom':'right'),labels:{color:'#64748b',font:{family:'Manrope',size:11,weight:'600'},boxWidth:10,padding:8}},tooltip:{callbacks:{label:c=>` ${c.label}: ${RUB(c.parsed)}`}}}}});
 }
 function drawBank(rows){
   const banks=uniq(DATA.map(d=>d.bank));
