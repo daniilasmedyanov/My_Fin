@@ -269,6 +269,51 @@ tr:hover td { background: var(--line2); }
 .debt-item .di-close:hover { background: var(--green); color: #fff; border-color: var(--green); }
 .debt-empty { text-align: center; color: var(--mut); font-size: 13px; padding: 20px 0; }
 
+/* ── TABS ── */
+.tabs { display:flex; gap:4px; margin-bottom:20px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:4px; width:fit-content; box-shadow:var(--shadow-sm); }
+.tab-btn { font-family:'Manrope'; font-size:13px; font-weight:700; padding:8px 18px; border:none; background:none; border-radius:9px; cursor:pointer; color:var(--mut2); transition:.15s; }
+.tab-btn.active { background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(37,99,235,.25); }
+.tab-pane { display:none; }
+.tab-pane.active { display:block; }
+
+/* ── BALANCE PAGE ── */
+.bal-banks { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:20px; }
+.bal-bank-card { background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:20px 22px; }
+.bal-bank-card h4 { font-size:13px; font-weight:800; color:var(--mut2); margin-bottom:12px; display:flex; align-items:center; gap:7px; }
+.bal-input { width:100%; font-family:'Manrope'; font-size:22px; font-weight:800; border:none; outline:none; background:none; color:var(--ink); letter-spacing:-.5px; }
+.bal-input:focus { color:var(--accent); }
+.bal-input-wrap { border-bottom:2px solid var(--line); padding-bottom:6px; display:flex; align-items:center; gap:6px; }
+.bal-input-wrap:focus-within { border-color:var(--accent); }
+.bal-rub { font-size:18px; font-weight:800; color:var(--mut); }
+.bal-updated { font-size:11px; color:var(--mut); margin-top:6px; font-weight:500; }
+.bal-total-card { background:var(--ink); color:#fff; border-radius:var(--r); padding:22px 26px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.bal-total-card .lbl { font-size:12px; font-weight:700; opacity:.6; text-transform:uppercase; letter-spacing:.5px; }
+.bal-total-card .val { font-size:36px; font-weight:800; letter-spacing:-1px; margin-top:4px; }
+.bal-total-card .sub { font-size:12px; opacity:.5; margin-top:4px; }
+
+/* ── CREDITS ── */
+.credits-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:10px; }
+.credits-header h3 { font-size:16px; font-weight:800; }
+.credit-list { display:flex; flex-direction:column; gap:12px; }
+.credit-card { background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:18px 20px; }
+.credit-card .cr-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.credit-card .cr-name { font-size:14px; font-weight:800; flex:1; }
+.credit-card .cr-type { font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; }
+.credit-card .cr-type.loan { background:var(--red-light); color:var(--red); }
+.credit-card .cr-type.card { background:var(--vio-light); color:var(--vio); }
+.credit-card .cr-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.credit-card .cr-stat .cs-lbl { font-size:10px; color:var(--mut); font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+.credit-card .cr-stat .cs-val { font-size:16px; font-weight:800; margin-top:3px; }
+.progress-wrap { background:var(--line2); border-radius:20px; height:8px; overflow:hidden; }
+.progress-bar { height:100%; border-radius:20px; background:linear-gradient(90deg,var(--accent),#60a5fa); transition:width .4s ease; }
+.progress-bar.danger { background:linear-gradient(90deg,var(--red),#f87171); }
+.cr-note { font-size:11px; color:var(--mut); margin-top:6px; font-weight:500; }
+.credit-empty { text-align:center; padding:40px 20px; color:var(--mut2); }
+.credit-empty .e-icon { font-size:32px; margin-bottom:10px; opacity:.4; }
+
+/* ── RESPONSIVE BALANCE ── */
+@media(max-width:780px) { .bal-banks { grid-template-columns:1fr; } }
+
 /* ── RESPONSIVE ── */
 @media(max-width: 960px) {
   .cards { grid-template-columns: repeat(2, 1fr); }
@@ -307,6 +352,15 @@ tr:hover td { background: var(--line2); }
 
 <!-- MAIN -->
 <main class="main">
+
+  <!-- TABS NAV -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('ops')">📊 Операции</button>
+    <button class="tab-btn" onclick="switchTab('bal')">🏦 Балансы и кредиты</button>
+  </div>
+
+  <!-- TAB: ОПЕРАЦИИ -->
+  <div class="tab-pane active" id="tab-ops">
 
   <!-- PERIOD -->
   <div class="period-bar">
@@ -436,6 +490,69 @@ tr:hover td { background: var(--line2); }
     </div>
   </div>
 
+  </div><!-- /tab-ops -->
+
+  <!-- TAB: БАЛАНСЫ И КРЕДИТЫ -->
+  <div class="tab-pane" id="tab-bal">
+
+    <!-- TOTAL BALANCE -->
+    <div class="bal-total-card">
+      <div>
+        <div class="lbl">Общий баланс по счетам</div>
+        <div class="val" id="balTotal">0 ₽</div>
+        <div class="sub" id="balSub">обновляй остатки ниже вручную</div>
+      </div>
+      <div style="text-align:right">
+        <div class="lbl">Долговая нагрузка</div>
+        <div style="font-size:28px;font-weight:800;margin-top:4px" id="balCredit">0 ₽</div>
+        <div class="sub">остаток по кредитам</div>
+      </div>
+    </div>
+
+    <!-- BANK BALANCES -->
+    <div style="font-size:13px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Остатки на счетах</div>
+    <div class="bal-banks">
+      <div class="bal-bank-card">
+        <h4>🟡 Т-Банк</h4>
+        <div class="bal-input-wrap">
+          <input class="bal-input" type="number" id="bal-tbank" placeholder="0" oninput="saveBalances()">
+          <span class="bal-rub">₽</span>
+        </div>
+        <div class="bal-updated" id="bal-tbank-upd">не обновлялся</div>
+      </div>
+      <div class="bal-bank-card">
+        <h4>🔴 Альфа-Банк</h4>
+        <div class="bal-input-wrap">
+          <input class="bal-input" type="number" id="bal-alfa" placeholder="0" oninput="saveBalances()">
+          <span class="bal-rub">₽</span>
+        </div>
+        <div class="bal-updated" id="bal-alfa-upd">не обновлялся</div>
+      </div>
+      <div class="bal-bank-card">
+        <h4>🔴 Яндекс Банк</h4>
+        <div class="bal-input-wrap">
+          <input class="bal-input" type="number" id="bal-yandex" placeholder="0" oninput="saveBalances()">
+          <span class="bal-rub">₽</span>
+        </div>
+        <div class="bal-updated" id="bal-yandex-upd">не обновлялся</div>
+      </div>
+    </div>
+
+    <!-- CREDITS -->
+    <div class="credits-header">
+      <h3>💳 Кредиты и кредитные карты</h3>
+      <button class="btn primary" onclick="openCreditModal()">+ Добавить кредит</button>
+    </div>
+    <div class="credit-list" id="creditList">
+      <div class="credit-empty">
+        <div class="e-icon">💳</div>
+        <p style="font-weight:700;color:var(--ink2)">Нет кредитов</p>
+        <p style="font-size:13px;margin-top:4px">Добавь кредит или кредитную карту</p>
+      </div>
+    </div>
+
+  </div><!-- /tab-bal -->
+
 </main>
 
 <footer class="foot">
@@ -466,6 +583,30 @@ tr:hover td { background: var(--line2); }
     <div class="modal-foot">
       <button class="btn primary" onclick="addOp()">Сохранить</button>
       <button class="btn" onclick="closeAdd()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- CREDIT MODAL -->
+<div class="modal" id="creditModal">
+  <div class="modal-box">
+    <h3 id="creditModalTitle">+ Новый кредит</h3>
+    <div class="field"><label>Название</label><input type="text" id="crName" placeholder="напр. Ипотека Альфа, Тинькофф Платинум"></div>
+    <div class="field"><label>Тип</label>
+      <select id="crType">
+        <option value="loan">Кредит / рассрочка</option>
+        <option value="card">Кредитная карта</option>
+      </select>
+    </div>
+    <div class="field"><label>Остаток долга / задолженность (₽)</label><input type="number" id="crDebt" step="0.01" placeholder="150000" min="0"></div>
+    <div class="field" id="crTotalWrap"><label>Начальная сумма кредита (₽)</label><input type="number" id="crTotal" step="0.01" placeholder="300000" min="0"></div>
+    <div class="field"><label>Ежемесячный платёж (₽)</label><input type="number" id="crPayment" step="0.01" placeholder="8500" min="0"></div>
+    <div class="field"><label>Дата ближайшего списания</label><input type="date" id="crDate"></div>
+    <div class="field" id="crLimitWrap" style="display:none"><label>Кредитный лимит (₽)</label><input type="number" id="crLimit" step="0.01" placeholder="100000" min="0"></div>
+    <div class="field"><label>Процентная ставка (% год)</label><input type="number" id="crRate" step="0.1" placeholder="19.9" min="0"></div>
+    <div class="modal-foot">
+      <button class="btn primary" onclick="saveCredit()">Сохранить</button>
+      <button class="btn" onclick="document.getElementById('creditModal').classList.remove('show')">Отмена</button>
     </div>
   </div>
 </div>
@@ -526,6 +667,216 @@ function clearAll() {
   DATA = [];
   save(); initFilters(); render();
   toast('Все данные удалены');
+}
+
+// ═══════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.getAttribute('onclick') === `switchTab('${name}')`) b.classList.add('active');
+  });
+  if (name === 'bal') { loadBalances(); renderCredits(); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  BALANCES
+// ═══════════════════════════════════════════════════════
+const BAL_KEY = 'finance_balances_v1';
+const CREDIT_KEY = 'finance_credits_v1';
+
+function saveBalances() {
+  const now = new Date().toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const banks = ['tbank','alfa','yandex'];
+  const data = {};
+  banks.forEach(b => {
+    const val = parseFloat(document.getElementById('bal-'+b).value) || 0;
+    const prev = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
+    data[b] = { val, updated: val !== (prev[b]?.val || 0) ? now : (prev[b]?.updated || 'не обновлялся') };
+    if (val !== (prev[b]?.val || null)) data[b].updated = now;
+  });
+  localStorage.setItem(BAL_KEY, JSON.stringify(data));
+  updateBalTotal();
+  if (gToken) driveSave();
+}
+
+function loadBalances() {
+  const data = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
+  ['tbank','alfa','yandex'].forEach(b => {
+    const el = document.getElementById('bal-'+b);
+    const upd = document.getElementById('bal-'+b+'-upd');
+    if (data[b]) {
+      el.value = data[b].val || '';
+      upd.textContent = 'обновлено: ' + (data[b].updated || '—');
+    }
+  });
+  updateBalTotal();
+}
+
+function updateBalTotal() {
+  const tbank  = parseFloat(document.getElementById('bal-tbank').value)  || 0;
+  const alfa   = parseFloat(document.getElementById('bal-alfa').value)    || 0;
+  const yandex = parseFloat(document.getElementById('bal-yandex').value)  || 0;
+  const total  = tbank + alfa + yandex;
+
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  const creditDebt = credits.reduce((a,c) => a + (parseFloat(c.debt) || 0), 0);
+
+  document.getElementById('balTotal').textContent  = RUB(total);
+  document.getElementById('balTotal').style.color  = total < 0 ? '#f87171' : '#fff';
+  document.getElementById('balCredit').textContent = RUB(creditDebt);
+  document.getElementById('balSub').textContent    =
+    `Т-Банк ${RUB(tbank)} · Альфа ${RUB(alfa)} · Яндекс ${RUB(yandex)}`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CREDITS
+// ═══════════════════════════════════════════════════════
+let _editCreditIdx = -1;
+
+function openCreditModal(idx) {
+  _editCreditIdx = (idx !== undefined) ? idx : -1;
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  const c = _editCreditIdx >= 0 ? credits[_editCreditIdx] : null;
+
+  document.getElementById('creditModalTitle').textContent = c ? '✏️ Редактировать' : '+ Новый кредит';
+  document.getElementById('crName').value    = c?.name    || '';
+  document.getElementById('crType').value    = c?.type    || 'loan';
+  document.getElementById('crDebt').value    = c?.debt    || '';
+  document.getElementById('crTotal').value   = c?.total   || '';
+  document.getElementById('crPayment').value = c?.payment || '';
+  document.getElementById('crDate').value    = c?.date    || new Date().toISOString().slice(0,10);
+  document.getElementById('crLimit').value   = c?.limit   || '';
+  document.getElementById('crRate').value    = c?.rate    || '';
+
+  toggleCreditFields();
+  document.getElementById('creditModal').classList.add('show');
+}
+
+function toggleCreditFields() {
+  const isCard = document.getElementById('crType').value === 'card';
+  document.getElementById('crLimitWrap').style.display  = isCard ? '' : 'none';
+  document.getElementById('crTotalWrap').style.display  = isCard ? 'none' : '';
+}
+document.addEventListener('change', e => { if (e.target.id === 'crType') toggleCreditFields(); });
+
+function saveCredit() {
+  const name = document.getElementById('crName').value.trim();
+  if (!name) { toast('Укажи название'); return; }
+  const debt = parseFloat(document.getElementById('crDebt').value);
+  if (isNaN(debt) || debt < 0) { toast('Укажи остаток долга'); return; }
+
+  const credit = {
+    name,
+    type:    document.getElementById('crType').value,
+    debt:    debt,
+    total:   parseFloat(document.getElementById('crTotal').value)   || 0,
+    payment: parseFloat(document.getElementById('crPayment').value) || 0,
+    date:    document.getElementById('crDate').value,
+    limit:   parseFloat(document.getElementById('crLimit').value)   || 0,
+    rate:    parseFloat(document.getElementById('crRate').value)    || 0,
+  };
+
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  if (_editCreditIdx >= 0) credits[_editCreditIdx] = credit;
+  else credits.push(credit);
+  localStorage.setItem(CREDIT_KEY, JSON.stringify(credits));
+
+  document.getElementById('creditModal').classList.remove('show');
+  renderCredits(); updateBalTotal();
+  toast('✓ Сохранено');
+  if (gToken) driveSave();
+}
+
+function deleteCredit(idx) {
+  if (!confirm('Удалить этот кредит?')) return;
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  credits.splice(idx, 1);
+  localStorage.setItem(CREDIT_KEY, JSON.stringify(credits));
+  renderCredits(); updateBalTotal();
+  toast('Удалено');
+}
+
+function renderCredits() {
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  const el = document.getElementById('creditList');
+  if (!credits.length) {
+    el.innerHTML = `<div class="credit-empty"><div class="e-icon">💳</div><p style="font-weight:700;color:var(--ink2)">Нет кредитов</p><p style="font-size:13px;margin-top:4px">Добавь кредит или кредитную карту</p></div>`;
+    return;
+  }
+
+  el.innerHTML = credits.map((c, i) => {
+    const isCard  = c.type === 'card';
+    const pct     = isCard
+      ? (c.limit > 0 ? Math.round(c.debt / c.limit * 100) : 0)
+      : (c.total > 0 ? Math.round((1 - c.debt / c.total) * 100) : 0);
+    const danger  = isCard ? pct > 70 : pct < 30;
+
+    // Месяцев до погашения
+    const monthsLeft = (c.payment > 0 && c.debt > 0) ? Math.ceil(c.debt / c.payment) : null;
+
+    // Дней до платежа
+    let daysMsg = '';
+    if (c.date) {
+      const diff = Math.round((new Date(c.date) - new Date()) / 86400000);
+      if (diff < 0)       daysMsg = `<span style="color:var(--red);font-weight:700">просрочен!</span>`;
+      else if (diff === 0) daysMsg = `<span style="color:var(--amber);font-weight:700">сегодня!</span>`;
+      else if (diff <= 5) daysMsg = `<span style="color:var(--amber);font-weight:700">через ${diff} дн.</span>`;
+      else                daysMsg = `через ${diff} дн.`;
+    }
+
+    // Дата следующего платежа красиво
+    const nextDate = c.date
+      ? new Date(c.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})
+      : '—';
+
+    return `<div class="credit-card">
+      <div class="cr-head">
+        <div class="cr-name">${esc(c.name)}</div>
+        <span class="cr-type ${c.type}">${isCard ? 'Кредитная карта' : 'Кредит'}</span>
+        <button class="btn" style="padding:4px 10px;font-size:11px" onclick="openCreditModal(${i})">✏️</button>
+        <button class="btn" style="padding:4px 10px;font-size:11px;color:var(--red)" onclick="deleteCredit(${i})">✕</button>
+      </div>
+
+      <!-- Главные цифры -->
+      <div class="cr-stats" style="grid-template-columns:repeat(${isCard ? 3 : 4},1fr)">
+        <div class="cr-stat">
+          <div class="cs-lbl">${isCard ? 'Задолженность' : 'Остаток долга'}</div>
+          <div class="cs-val" style="color:var(--red)">${RUB(c.debt)}</div>
+        </div>
+        ${!isCard && c.total ? `
+        <div class="cr-stat">
+          <div class="cs-lbl">Сумма кредита</div>
+          <div class="cs-val" style="color:var(--mut2)">${RUB(c.total)}</div>
+        </div>` : ''}
+        <div class="cr-stat">
+          <div class="cs-lbl">Платёж / мес</div>
+          <div class="cs-val" style="color:var(--accent)">${c.payment ? RUB(c.payment) : '—'}</div>
+        </div>
+        <div class="cr-stat">
+          <div class="cs-lbl">${isCard ? 'Лимит' : 'До погашения'}</div>
+          <div class="cs-val">${isCard ? RUB(c.limit) : (monthsLeft ? monthsLeft + ' мес.' : '—')}</div>
+        </div>
+      </div>
+
+      <!-- Прогресс -->
+      <div class="progress-wrap">
+        <div class="progress-bar ${danger ? 'danger' : ''}" style="width:${Math.min(pct,100)}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;align-items:center">
+        <span class="cr-note">${isCard ? `использовано ${pct}% лимита` : `погашено ${pct}%`}${c.rate ? ` · ${c.rate}% год.` : ''}</span>
+
+        <!-- Дата следующего платежа — крупно -->
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Ближайшее списание</div>
+          <div style="font-size:14px;font-weight:800;margin-top:2px">${nextDate} ${daysMsg ? '·&nbsp;' + daysMsg : ''}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════════
