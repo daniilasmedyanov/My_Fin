@@ -711,61 +711,85 @@ function parseAlfaXLSX(workbook) {
   for (let i = 0; i < arr.length; i++) {
     if (arr[i].some(cell => String(cell).trim() === 'Дата операции')) { hrow = i; break; }
   }
-  if (hrow < 0) {
-    console.warn('[Альфа] Не найдена строка заголовков');
-    return [];
-  }
+  if (hrow < 0) { console.warn('[Альфа] Не найдена строка заголовков'); return []; }
 
-  // Определяем индексы колонок по именам — не зависит от порядка
-  const headers = arr[hrow].map(h => String(h).trim());
-  const col = name => headers.indexOf(name);
+  const headers = arr[hrow].map(h => String(h).replace(/\u00a0/g,' ').trim());
+  const col = name => headers.findIndex(h => h.includes(name));
+
   const iDate = col('Дата операции');
-  const iDesc = col('Описание операции');
+  const iCat  = col('Категория');
+  const iDesc = col('Описание');           // формат 2: "Описание"
+  const iDescOp = col('Описание операции'); // формат 1: "Описание операции"
   const iAmt  = col('Сумма');
   const iStat = col('Статус');
-  const iCat  = col('Категория');
-  const iKind = col('Тип'); // "Списание" / "Пополнение"
+  const iKind = col('Тип');                // только в формате 1
+
+  // Определяем формат по наличию колонки "Тип"
+  const isFmt1 = iKind !== -1; // формат 1: Statement_*.XLSX (есть Тип: Списание/Пополнение)
+  // формат 2: Выписка_*.xlsx (знак уже в сумме, нет колонки Тип)
+
+  const descCol = iDescOp !== -1 ? iDescOp : iDesc;
+  const amtCol  = iAmt !== -1 ? iAmt : col('Сумма в валюте счета');
+
+  // Вспомогательная: парсит сумму строку с nbsp и запятыми
+  const parseAmt = s => parseFloat(
+    String(s||'').replace(/\u00a0/g,'').replace(/\s/g,'').replace(',','.')
+  );
 
   const out = [];
   for (let i = hrow + 1; i < arr.length; i++) {
     const r = arr[i];
     const date = ddmmyyyy(r[iDate]); if (!date) continue;
 
-    // Статус: пропускаем явно неуспешные; пустой статус — разрешаем (напр. зарплата)
+    // Статус: пропускаем только явно неуспешные ("В обработке", "HOLD" и т.п.)
+    // Пустой статус и "Выполнен" — разрешаем
     const stat = String(r[iStat]||'').trim().toLowerCase();
     if (stat && stat !== 'выполнен') continue;
 
-    const rawAmt = parseFloat(String(r[iAmt]||'').replace(/\s/g,'').replace(',','.'));
+    const rawAmt = parseAmt(r[amtCol]);
     if (isNaN(rawAmt) || rawAmt === 0) continue;
 
-    const kind   = String(r[iKind]||'').trim(); // "Списание" или "Пополнение"
-    // Сумма: Списание → отрицательная, Пополнение → положительная
-    const amount = kind === 'Списание' ? -Math.abs(rawAmt) : Math.abs(rawAmt);
+    let amount;
+    if (isFmt1) {
+      // Формат 1: сумма всегда положительная, знак определяется колонкой Тип
+      const kind = String(r[iKind]||'').trim();
+      amount = kind === 'Списание' ? -Math.abs(rawAmt) : Math.abs(rawAmt);
+    } else {
+      // Формат 2: знак уже зашит в сумму
+      amount = rawAmt;
+    }
 
-    const desc = String(r[iDesc]||'').trim();
-    const cat  = String(r[iCat] ||'').trim() || 'Прочее';
+    const desc = String(r[descCol]||'').trim();
+    const cat  = String(r[iCat]  ||'').trim() || 'Прочее';
     const dl   = desc.toLowerCase();
 
     // Тип операции
     let typ;
-    const selfInt = dl.includes('между своими счетами');
+    const selfInt = dl.includes('внутрибанковский перевод') || dl.includes('между своими счетами');
     const selfPh  = isSelfPhone(desc);
     if (selfInt || selfPh) {
       typ = 'self';
-    } else if (kind === 'Пополнение') {
-      // Всё пополнение — доход (зарплата, переводы на свой счёт итд)
+    } else if (amount > 0) {
       typ = 'income';
-    } else if (dl.includes('перевод') && !selfInt && !selfPh) {
+    } else if (dl.includes('перевод')) {
       typ = 'transfer';
     } else {
       typ = 'expense';
     }
 
-    // Короткое описание
-    let short = desc;
+    // Короткое описание — убираем техпрефиксы
+    let short = desc
+      .replace(/^Категория:[^.]+\./,'')           // "Категория: Перевод по СБП."
+      .replace(/^Перевод \w+ через Систему быстрых платежей (от |на )?/i, 'СБП ')
+      .replace(/^Платеж \w+ /i,'')
+      .trim();
     if (selfInt)  short = 'Между своими счетами Альфа';
     else if (selfPh) short = 'Перевод на свой счёт';
     else if (dl.includes('заработная плата')) short = 'Заработная плата';
+    else if (dl.includes('операция по карте')) {
+      const place = desc.match(/место совершения операции:\s*([^,]+)/i);
+      short = place ? place[1].trim() : 'Оплата картой';
+    }
 
     out.push({
       date, time:'00:00:00', month:date.slice(0,7),
@@ -773,8 +797,7 @@ function parseAlfaXLSX(workbook) {
       amount: Math.round(amount * 100) / 100,
       category: cat,
       desc: short.slice(0, 80),
-      mcc: String(r[col('MCC код')]||'').trim(),
-      card: '',
+      mcc: '', card: '',
       type: typ
     });
   }
