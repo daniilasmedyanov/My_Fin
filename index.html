@@ -247,6 +247,28 @@ tr:hover td { background: var(--line2); }
   border-top: 1px solid var(--line); padding-top: 20px;
 }
 
+/* ── DEBT SECTION ── */
+.debt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.debt-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); padding: 20px 22px; }
+.debt-card h3 { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.debt-card .ch-sub { font-size: 12px; color: var(--mut); margin-top: 2px; margin-bottom: 14px; font-weight: 500; }
+.debt-total { font-size: 22px; font-weight: 800; margin-bottom: 14px; }
+.debt-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; background: var(--line2); margin-bottom: 8px;
+}
+.debt-item:last-child { margin-bottom: 0; }
+.debt-item .di-name { flex: 1; font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.debt-item .di-date { font-size: 11px; color: var(--mut); font-weight: 500; white-space: nowrap; }
+.debt-item .di-amt { font-weight: 800; font-size: 14px; white-space: nowrap; }
+.debt-item .di-close {
+  background: none; border: 1px solid var(--line); border-radius: 7px;
+  padding: 3px 9px; font-size: 11px; font-weight: 700; cursor: pointer;
+  color: var(--mut2); font-family: 'Manrope'; transition: .15s; white-space: nowrap; flex-shrink: 0;
+}
+.debt-item .di-close:hover { background: var(--green); color: #fff; border-color: var(--green); }
+.debt-empty { text-align: center; color: var(--mut); font-size: 13px; padding: 20px 0; }
+
 /* ── RESPONSIVE ── */
 @media(max-width: 960px) {
   .cards { grid-template-columns: repeat(2, 1fr); }
@@ -370,10 +392,11 @@ tr:hover td { background: var(--line2); }
             <th>Категория</th>
             <th>Описание</th>
             <th class="r">Сумма</th>
+            <th class="r">Долг</th>
           </tr>
         </thead>
         <tbody id="tbody">
-          <tr><td colspan="6">
+          <tr><td colspan="7">
             <div class="empty">
               <div class="e-icon">📂</div>
               <h4>Нет операций</h4>
@@ -382,6 +405,34 @@ tr:hover td { background: var(--line2); }
           </td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- DEBTS -->
+  <div style="margin-top:24px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+    <div>
+      <h2 style="font-size:18px;font-weight:800;letter-spacing:-.4px">💸 Долги</h2>
+      <p style="font-size:12px;color:var(--mut2);margin-top:3px">Помечай операции кнопкой «Долг» в таблице, или добавляй вручную</p>
+    </div>
+  </div>
+  <div class="debt-grid">
+    <div class="debt-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <h3>🟢 Мне должны</h3>
+        <button class="btn" style="font-size:12px;padding:5px 11px" onclick="openDebtModal('owe')">+ Добавить</button>
+      </div>
+      <div class="ch-sub">я дал деньги — жду возврата</div>
+      <div class="debt-total" id="debtOweTotal" style="color:var(--green)">0 ₽</div>
+      <div id="debtOweList"><div class="debt-empty">Нет активных долгов</div></div>
+    </div>
+    <div class="debt-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+        <h3>🔴 Я должен</h3>
+        <button class="btn" style="font-size:12px;padding:5px 11px" onclick="openDebtModal('owed')">+ Добавить</button>
+      </div>
+      <div class="ch-sub">мне дали деньги — надо вернуть</div>
+      <div class="debt-total" id="debtOwedTotal" style="color:var(--red)">0 ₽</div>
+      <div id="debtOwedList"><div class="debt-empty">Нет активных долгов</div></div>
     </div>
   </div>
 
@@ -601,18 +652,134 @@ function drawIE(rows) {
 function drawTable(rows) {
   const sorted = rows.slice().sort((a,b) => (b.date+b.time).localeCompare(a.date+a.time));
   if (!sorted.length) {
-    document.getElementById('tbody').innerHTML = `<tr><td colspan="6"><div class="empty"><div class="e-icon">🔍</div><h4>Нет операций</h4><p>Попробуй изменить фильтры</p></div></td></tr>`;
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="e-icon">🔍</div><h4>Нет операций</h4><p>Попробуй изменить фильтры</p></div></td></tr>`;
     return;
   }
-  document.getElementById('tbody').innerHTML = sorted.map(d => `
-    <tr>
+  document.getElementById('tbody').innerHTML = sorted.map((d,i) => {
+    // найдём реальный индекс в DATA для пометки
+    const idx = DATA.indexOf(d);
+    const isDebt = !!d.debt;
+    const debtBtn = `<button onclick="toggleDebt(${idx})" style="
+      font-family:Manrope;font-size:11px;font-weight:700;cursor:pointer;border-radius:7px;padding:3px 9px;
+      border:1px solid ${isDebt ? 'var(--amber)' : 'var(--line)'};
+      background:${isDebt ? 'var(--amber-light)' : 'transparent'};
+      color:${isDebt ? 'var(--amber)' : 'var(--mut)'};
+      transition:.15s;white-space:nowrap;
+    ">${isDebt ? '💰 Долг' : 'Долг'}</button>`;
+    return `<tr>
       <td style="white-space:nowrap;color:var(--mut2);font-size:12px">${d.date}</td>
       <td><span class="bankpill">${esc(d.bank)}</span></td>
       <td><span class="tag ${d.type}">${TYPE_LABEL[d.type]||d.type}</span></td>
       <td><span class="cat-pill" title="${esc(d.category)}">${esc(d.category||'—')}</span></td>
       <td style="color:var(--ink2)">${esc(d.desc||'')}</td>
       <td class="amt ${d.amount<0?'neg':'pos'}">${RUB(d.amount)}</td>
-    </tr>`).join('');
+      <td style="text-align:right">${debtBtn}</td>
+    </tr>`;
+  }).join('');
+  drawDebts();
+}
+
+// ═══════════════════════════════════════════════════════
+//  DEBTS
+// ═══════════════════════════════════════════════════════
+let _debtModalDir = 'owe'; // 'owe' = мне должны, 'owed' = я должен
+
+function openDebtModal(dir) {
+  _debtModalDir = dir;
+  document.getElementById('debtModalTitle').textContent = dir === 'owe' ? '🟢 Мне должны — добавить' : '🔴 Я должен — добавить';
+  document.getElementById('dDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('dDesc').value = '';
+  document.getElementById('dAmt').value  = '';
+  document.getElementById('debtModal').classList.add('show');
+}
+
+function saveDebtManual() {
+  const desc = document.getElementById('dDesc').value.trim();
+  const amt  = parseFloat(document.getElementById('dAmt').value);
+  const date = document.getElementById('dDate').value;
+  if (!desc) { toast('Укажи описание'); return; }
+  if (isNaN(amt) || amt <= 0) { toast('Укажи сумму больше 0'); return; }
+  if (!date) { toast('Укажи дату'); return; }
+  // owe = мне должны = я дал = отрицательная сумма
+  // owed = я должен = мне дали = положительная сумма
+  const amount = _debtModalDir === 'owe' ? -amt : amt;
+  DATA.push({
+    date, time:'00:00:00', month:date.slice(0,7),
+    bank:'Вручную', amount: Math.round(amount*100)/100,
+    category:'Долг', desc,
+    mcc:'', card:'',
+    type: _debtModalDir === 'owe' ? 'transfer' : 'income',
+    debt: true,          // сразу помечаем как долг
+    debtManual: true     // флаг что добавлен вручную
+  });
+  document.getElementById('debtModal').classList.remove('show');
+  save(); initFilters(); render();
+  toast('✓ Долг добавлен');
+}
+
+// Переключить флаг долга на операции — синхронизируется в обе стороны
+function toggleDebt(idx) {
+  if (!DATA[idx]) return;
+  DATA[idx].debt = !DATA[idx].debt;
+  // Если снимаем флаг — сбрасываем и debtClosed
+  if (!DATA[idx].debt) DATA[idx].debtClosed = false;
+  save(); render();
+}
+
+// Закрыть долг — убирает из обоих списков
+function closeDebt(idx) {
+  if (!DATA[idx]) return;
+  DATA[idx].debtClosed = true;
+  save(); render();
+  toast('✓ Долг закрыт');
+}
+
+// Снять флаг долга прямо из раздела долгов (кнопка «Убрать»)
+function removeDebt(idx) {
+  if (!DATA[idx]) return;
+  DATA[idx].debt = false;
+  DATA[idx].debtClosed = false;
+  // Если это ручной долг — удаляем запись совсем
+  if (DATA[idx].debtManual) {
+    DATA.splice(idx, 1);
+  }
+  save(); initFilters(); render();
+  toast('Долг убран');
+}
+
+function drawDebts() {
+  // Мне должны: я дал деньги (сумма < 0)
+  const owe  = DATA.filter(d => d.debt && !d.debtClosed && d.amount < 0);
+  // Я должен: мне дали деньги (сумма > 0)
+  const owed = DATA.filter(d => d.debt && !d.debtClosed && d.amount > 0);
+
+  const oweTotal  = owe.reduce((a,d) => a + Math.abs(d.amount), 0);
+  const owedTotal = owed.reduce((a,d) => a + d.amount, 0);
+
+  document.getElementById('debtOweTotal').textContent  = RUB(oweTotal);
+  document.getElementById('debtOwedTotal').textContent = RUB(owedTotal);
+
+  const renderList = (items, listId) => {
+    const el = document.getElementById(listId);
+    if (!items.length) { el.innerHTML = '<div class="debt-empty">Нет активных долгов</div>'; return; }
+    el.innerHTML = items.map(d => {
+      const idx = DATA.indexOf(d);
+      return `<div class="debt-item">
+        <div style="flex:1;min-width:0">
+          <div class="di-name">${esc(d.desc||'—')}</div>
+          <div class="di-date">${d.date} · ${esc(d.bank)}</div>
+        </div>
+        <div class="di-amt" style="color:${d.amount<0?'var(--green)':'var(--red)'};font-weight:800;font-size:14px;white-space:nowrap">
+          ${RUB(Math.abs(d.amount))}
+        </div>
+        <button class="di-close" onclick="closeDebt(${idx})" title="Отметить как возвращённый">✓ Закрыт</button>
+        <button class="di-close" onclick="removeDebt(${idx})" title="Убрать из долгов" style="margin-left:4px">✕</button>
+      </div>`;
+    }).join('');
+  };
+
+  renderList(owe,  'debtOweList');
+  renderList(owed, 'debtOwedList');
 }
 
 // ═══════════════════════════════════════════════════════
@@ -994,5 +1161,19 @@ initFilters();
 render();
 setTimeout(initGoogle, 800);
 </script>
+<!-- DEBT MODAL -->
+<div class="modal" id="debtModal">
+  <div class="modal-box">
+    <h3 id="debtModalTitle">+ Новый долг</h3>
+    <div class="field"><label>Кто / описание</label><input type="text" id="dDesc" placeholder="напр. Саша, кафе в пятницу"></div>
+    <div class="field"><label>Сумма (₽)</label><input type="number" id="dAmt" step="0.01" placeholder="1500" min="0"></div>
+    <div class="field"><label>Дата</label><input type="date" id="dDate"></div>
+    <div class="modal-foot">
+      <button class="btn primary" onclick="saveDebtManual()">Сохранить</button>
+      <button class="btn" onclick="document.getElementById('debtModal').classList.remove('show')">Отмена</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
