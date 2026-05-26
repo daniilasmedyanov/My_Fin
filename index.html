@@ -900,26 +900,56 @@ function setSync(text, active = false) {
   document.getElementById('syncDot').classList.toggle('active', active);
 }
 function gReady() { return GOOGLE_CLIENT_ID && typeof google !== 'undefined' && google.accounts; }
+
+// Автообновление токена за 5 минут до истечения (токен живёт 1 час)
+let tokenExpireTimer = null;
+function scheduleTokenRefresh() {
+  clearTimeout(tokenExpireTimer);
+  // Обновляем через 55 минут (токен живёт 60 мин)
+  tokenExpireTimer = setTimeout(() => {
+    if (tokenClient) {
+      tokenClient.requestAccessToken({ prompt: '' }); // тихий refresh без диалога
+    }
+  }, 55 * 60 * 1000);
+}
+
 function initGoogle() {
   const btn = document.getElementById('gBtn');
   if (!GOOGLE_CLIENT_ID) { btn.textContent = 'Google (нужен Client ID)'; btn.disabled = true; return; }
   try {
+    const hint = localStorage.getItem('g_hint') || ''; // сохранённый email для silent login
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope: 'https://www.googleapis.com/auth/drive.file',
+      hint, // подсказывает Google какой аккаунт использовать — убирает повторный выбор
       callback: async resp => {
         if (resp.access_token) {
           gToken = resp.access_token;
           btn.textContent = '✓ Google';
+          scheduleTokenRefresh();
           await driveLoad();
         }
       }
     });
+    // Пробуем тихий вход при загрузке страницы (если уже авторизовывались раньше)
+    if (hint) {
+      tokenClient.requestAccessToken({ prompt: '' });
+    }
   } catch(e) { btn.textContent = 'Google: ошибка'; }
 }
 function gSignIn() {
-  if (!gReady()) { toast('Впиши GOOGLE_CLIENT_ID в код и открой по https'); return; }
-  tokenClient.requestAccessToken({ prompt: gToken ? '' : 'consent' });
+  if (!gReady()) { toast('Открой файл по http:// а не file://'); return; }
+  // При ручном входе показываем выбор аккаунта, сохраняем hint
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: id => {
+      try {
+        const payload = JSON.parse(atob(id.credential.split('.')[1]));
+        if (payload.email) localStorage.setItem('g_hint', payload.email);
+      } catch(e) {}
+    }
+  });
+  tokenClient.requestAccessToken({ prompt: 'consent' });
 }
 async function driveFindFile() {
   const q = encodeURIComponent(`name='${DRIVE_FILENAME}' and trashed=false`);
