@@ -1843,17 +1843,7 @@ function renderPlanTimeline() {
     const incEv = periodEvents.filter(e => e.type === 'income');
     const expEv = periodEvents.filter(e => e.type !== 'income');
 
-    incEv.forEach(e => {
-      evHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(22,163,74,.08);border-radius:10px;margin-bottom:8px;border:1px solid rgba(22,163,74,.15)">
-        <div style="width:32px;height:32px;border-radius:8px;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💵</div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:800;color:#15803d">${esc(e.name)}</div>
-          <div style="font-size:11px;color:var(--mut2)">${e.day}-го числа</div>
-        </div>
-        <div style="font-size:15px;font-weight:800;color:#16a34a">+${RUB(e.amt)}</div>
-      </div>`;
-    });
-
+    // Сначала расходы, потом ЗП в конце (она приходит в конце периода)
     if (expEv.length === 0 && incEv.length === 0) {
       evHtml = '<div style="text-align:center;color:var(--mut);font-size:13px;padding:12px 0">Нет платежей в этот период</div>';
     }
@@ -1876,14 +1866,26 @@ function renderPlanTimeline() {
       </div>`;
     });
 
+    // ЗП в конце периода
+    incEv.forEach(e => {
+      evHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(22,163,74,.08);border-radius:10px;margin-top:4px;border:1px solid rgba(22,163,74,.2)">
+        <div style="width:32px;height:32px;border-radius:8px;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💵</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:#15803d">${esc(e.name)}</div>
+          <div style="font-size:11px;color:var(--mut2)">${e.day}-го числа · поступление</div>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:#16a34a">+${RUB(e.amt)}</div>
+      </div>`;
+    });
+
     return `<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden;${isNow ? 'border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.08)' : ''}">
       <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:${isNow ? 'var(--accent-light)' : 'var(--line2)'}">
         <div>
           <div style="font-size:14px;font-weight:800;${isNow ? 'color:var(--accent)' : ''}">${label}${isNow ? '&nbsp;<span style="font-size:11px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:20px">сейчас</span>' : ''}</div>
-          <div style="font-size:11px;color:var(--mut2);margin-top:2px">${sublabel} · расходы ${RUB(spending)}</div>
+          <div style="font-size:11px;color:var(--mut2);margin-top:2px">${sublabel}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:11px;color:var(--mut2)">остаток от ЗП</div>
+          <div style="font-size:11px;color:var(--mut2)">платежи ${RUB(spending)} · остаток</div>
           <div style="font-size:20px;font-weight:800;color:${left >= 0 ? 'var(--green)' : 'var(--red)'}">${RUB(left)}</div>
         </div>
       </div>
@@ -1891,21 +1893,21 @@ function renderPlanTimeline() {
     </div>`;
   };
 
-  // Период 1: 25-е → 10-е, живём на аванс (s1)
-  // Платежи: 26–31 текущего + 1–10 текущего (всё что до и включая 10-е, плюс после 25-го)
+  // Период 1: 25-е → 10-е
+  // Платишь: 26–31 + 1–10. В конце периода приходит аванс 10-го.
   html += renderPeriodBlock(
-    '25-е → 10-е · Аванс',
-    `аванс ${RUB(s1)}`,
-    [0, 10, 25, 31], // дни: 1–10 и 26–31
+    '25-е → 10-е',
+    `платежи до 10-го · аванс приходит 10-го`,
+    [0, 10, 25, 31],
     10, s1
   );
 
-  // Период 2: 10-е → 25-е, живём на основную (s2)
-  // Платежи: 11–25
+  // Период 2: 10-е → 25-е
+  // Платишь: 11–25. В конце периода приходит основная 25-го.
   html += renderPeriodBlock(
-    '10-е → 25-е · Основная ЗП',
-    `зарплата ${RUB(s2)}`,
-    [10, 25], // дни: 11–25
+    '10-е → 25-е',
+    `платежи до 25-го · зарплата приходит 25-го`,
+    [10, 25],
     25, s2
   );
 
