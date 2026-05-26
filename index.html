@@ -314,6 +314,23 @@ tr:hover td { background: var(--line2); }
 /* ── RESPONSIVE BALANCE ── */
 @media(max-width:780px) { .bal-banks { grid-template-columns:1fr; } }
 
+/* ── CONTEXT MENU ── */
+.ctx-menu {
+  position:fixed; z-index:200; background:var(--panel); border:1px solid var(--line);
+  border-radius:12px; box-shadow:0 8px 30px rgba(15,23,42,.15); padding:6px;
+  min-width:200px; display:none;
+}
+.ctx-menu.show { display:block; }
+.ctx-item {
+  display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px;
+  font-size:13px; font-weight:700; cursor:pointer; color:var(--ink2);
+  transition:.12s; border:none; background:none; width:100%; text-align:left; font-family:Manrope;
+}
+.ctx-item:hover { background:var(--line2); }
+.ctx-item.danger { color:var(--red); }
+.ctx-item.danger:hover { background:var(--red-light); }
+.ctx-sep { height:1px; background:var(--line); margin:4px 0; }
+
 /* ── RESPONSIVE ── */
 @media(max-width: 960px) {
   .cards { grid-template-columns: repeat(2, 1fr); }
@@ -357,6 +374,7 @@ tr:hover td { background: var(--line2); }
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('ops')">📊 Операции</button>
     <button class="tab-btn" onclick="switchTab('bal')">🏦 Балансы и кредиты</button>
+    <button class="tab-btn" onclick="switchTab('plan')">📅 Плановые платежи</button>
   </div>
 
   <!-- TAB: ОПЕРАЦИИ -->
@@ -502,6 +520,11 @@ tr:hover td { background: var(--line2); }
         <div class="val" id="balTotal">0 ₽</div>
         <div class="sub" id="balSub">обновляй остатки ниже вручную</div>
       </div>
+      <div style="text-align:center">
+        <div class="lbl">Платёж в этом месяце</div>
+        <div style="font-size:28px;font-weight:800;margin-top:4px" id="balMonthPay">0 ₽</div>
+        <div class="sub" id="balMonthPaySub">из всех кредитов</div>
+      </div>
       <div style="text-align:right">
         <div class="lbl">Долговая нагрузка</div>
         <div style="font-size:28px;font-weight:800;margin-top:4px" id="balCredit">0 ₽</div>
@@ -552,6 +575,53 @@ tr:hover td { background: var(--line2); }
     </div>
 
   </div><!-- /tab-bal -->
+
+  <!-- TAB: ПЛАНОВЫЕ ПЛАТЕЖИ -->
+  <div class="tab-pane" id="tab-plan">
+
+    <!-- ЗП настройки -->
+    <div class="bal-total-card" style="margin-bottom:20px">
+      <div>
+        <div class="lbl">Зарплата 1-я часть</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+          <span style="opacity:.6;font-size:13px">10-го числа</span>
+          <div style="border-bottom:2px solid rgba(255,255,255,.3);display:flex;align-items:center;gap:4px">
+            <input id="sal1" type="number" placeholder="0" oninput="saveSalary()" style="font-family:Manrope;font-size:22px;font-weight:800;border:none;outline:none;background:none;color:#fff;width:130px;letter-spacing:-.5px">
+            <span style="font-size:16px;opacity:.5">₽</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="lbl">Зарплата 2-я часть</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+          <span style="opacity:.6;font-size:13px">25-го числа</span>
+          <div style="border-bottom:2px solid rgba(255,255,255,.3);display:flex;align-items:center;gap:4px">
+            <input id="sal2" type="number" placeholder="0" oninput="saveSalary()" style="font-family:Manrope;font-size:22px;font-weight:800;border:none;outline:none;background:none;color:#fff;width:130px;letter-spacing:-.5px">
+            <span style="font-size:16px;opacity:.5">₽</span>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="lbl">Итого в месяц</div>
+        <div style="font-size:28px;font-weight:800;margin-top:4px" id="salTotal">0 ₽</div>
+        <div class="sub" id="planBalance">остаток после всех платежей</div>
+      </div>
+    </div>
+
+    <!-- Контролы -->
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn" onclick="planPrevMonth()">← </button>
+        <span style="font-size:15px;font-weight:800" id="planMonthLabel">—</span>
+        <button class="btn" onclick="planNextMonth()">→</button>
+      </div>
+      <button class="btn primary" onclick="openPlanModal()">+ Добавить платёж</button>
+    </div>
+
+    <!-- Временная шкала -->
+    <div id="planTimeline"></div>
+
+  </div><!-- /tab-plan -->
 
 </main>
 
@@ -611,6 +681,45 @@ tr:hover td { background: var(--line2); }
   </div>
 </div>
 
+<!-- PLAN MODAL -->
+<div class="modal" id="planModal">
+  <div class="modal-box">
+    <h3 id="planModalTitle">+ Плановый платёж</h3>
+    <div class="field"><label>Название</label><input type="text" id="pmName" placeholder="напр. Аренда, Netflix, Страховка"></div>
+    <div class="field"><label>Сумма (₽)</label><input type="number" id="pmAmt" step="0.01" placeholder="15000" min="0"></div>
+    <div class="field"><label>День месяца</label><input type="number" id="pmDay" min="1" max="31" placeholder="1"></div>
+    <div class="field"><label>Категория</label>
+      <select id="pmCat">
+        <option value="rent">🏠 Жильё / аренда</option>
+        <option value="sub">📱 Подписки</option>
+        <option value="food">🛒 Продукты</option>
+        <option value="transport">🚗 Транспорт</option>
+        <option value="health">💊 Здоровье</option>
+        <option value="other">📦 Прочее</option>
+      </select>
+    </div>
+    <div class="field"><label>Повторяется</label>
+      <select id="pmRepeat">
+        <option value="monthly">Каждый месяц</option>
+        <option value="once">Только в этом месяце</option>
+      </select>
+    </div>
+    <div class="modal-foot">
+      <button class="btn primary" onclick="savePlanPayment()">Сохранить</button>
+      <button class="btn" onclick="document.getElementById('planModal').classList.remove('show')">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div class="ctx-menu" id="ctxMenu">
+  <button class="ctx-item" id="ctxIgnore" onclick="ctxAction('ignore')">🚫 Не учитывать</button>
+  <button class="ctx-item" id="ctxDebt" onclick="ctxAction('debt')">💰 Пометить как долг</button>
+  <button class="ctx-item" id="ctxSelf" onclick="ctxAction('self')">🔄 Между своими счетами</button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item danger" onclick="ctxAction('delete')">🗑 Удалить операцию</button>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -651,8 +760,8 @@ const esc = s => (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&
 const num = s => parseFloat(String(s).replace(/\u00a0/g,'').replace(/\s/g,'').replace(',','.')) || 0;
 const ddmmyyyy = s => { const m = String(s||'').trim().match(/(\d{2})\.(\d{2})\.(\d{4})/); return m ? `${m[3]}-${m[2]}-${m[1]}` : null; };
 const isSelfPhone = desc => { const d = (desc||'').replace(/\u00a0/g,' '); return SELF_PHONES.some(p => d.includes(p)); };
-const isSpend = d => (d.type==='expense'||d.type==='transfer'||d.type==='cash') && d.amount < 0;
-const isInc   = d => (d.type==='income'||(d.type==='transfer'&&d.amount>0)) && d.amount > 0;
+const isSpend = d => !d.ignored && (d.type==='expense'||d.type==='transfer'||d.type==='cash') && d.amount < 0;
+const isInc   = d => !d.ignored && (d.type==='income'||(d.type==='transfer'&&d.amount>0)) && d.amount > 0;
 
 function toast(msg, duration = 3500) {
   const el = document.getElementById('toast');
@@ -679,7 +788,8 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(b => {
     if (b.getAttribute('onclick') === `switchTab('${name}')`) b.classList.add('active');
   });
-  if (name === 'bal') { loadBalances(); renderCredits(); }
+  if (name === 'bal')  { loadBalances(); renderCredits(); }
+  if (name === 'plan') { loadSalary(); renderPlanTimeline(); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -723,13 +833,24 @@ function updateBalTotal() {
   const total  = tbank + alfa + yandex;
 
   const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
-  const creditDebt = credits.reduce((a,c) => a + (parseFloat(c.debt) || 0), 0);
+  const creditDebt    = credits.reduce((a,c) => a + (parseFloat(c.debt) || 0), 0);
+  const includedPay   = credits.filter(c => c.includeInTotal !== false && c.payment > 0);
+  const excludedCount = credits.filter(c => c.includeInTotal === false).length;
+  const monthPay      = includedPay.reduce((a,c) => a + (parseFloat(c.payment) || 0), 0);
 
   document.getElementById('balTotal').textContent  = RUB(total);
   document.getElementById('balTotal').style.color  = total < 0 ? '#f87171' : '#fff';
   document.getElementById('balCredit').textContent = RUB(creditDebt);
   document.getElementById('balSub').textContent    =
     `Т-Банк ${RUB(tbank)} · Альфа ${RUB(alfa)} · Яндекс ${RUB(yandex)}`;
+  const mpEl = document.getElementById('balMonthPay');
+  const mpSubEl = document.getElementById('balMonthPaySub');
+  if (mpEl) {
+    mpEl.textContent = RUB(monthPay);
+    mpSubEl.textContent = excludedCount > 0
+      ? `${includedPay.length} из ${credits.length} кредитов (${excludedCount} откл.)`
+      : `из ${credits.length} кредит${credits.length===1?'а':credits.length<5?'ов':'ов'}`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -769,15 +890,18 @@ function saveCredit() {
   const debt = parseFloat(document.getElementById('crDebt').value);
   if (isNaN(debt) || debt < 0) { toast('Укажи остаток долга'); return; }
 
+  const credits_existing = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  const prevInclude = _editCreditIdx >= 0 ? credits_existing[_editCreditIdx]?.includeInTotal : true;
   const credit = {
     name,
-    type:    document.getElementById('crType').value,
-    debt:    debt,
-    total:   parseFloat(document.getElementById('crTotal').value)   || 0,
-    payment: parseFloat(document.getElementById('crPayment').value) || 0,
-    date:    document.getElementById('crDate').value,
-    limit:   parseFloat(document.getElementById('crLimit').value)   || 0,
-    rate:    parseFloat(document.getElementById('crRate').value)    || 0,
+    type:           document.getElementById('crType').value,
+    debt:           debt,
+    total:          parseFloat(document.getElementById('crTotal').value)   || 0,
+    payment:        parseFloat(document.getElementById('crPayment').value) || 0,
+    date:           document.getElementById('crDate').value,
+    limit:          parseFloat(document.getElementById('crLimit').value)   || 0,
+    rate:           parseFloat(document.getElementById('crRate').value)    || 0,
+    includeInTotal: prevInclude !== undefined ? prevInclude : true,
   };
 
   const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
@@ -800,15 +924,7 @@ function deleteCredit(idx) {
   toast('Удалено');
 }
 
-function renderCredits() {
-  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
-  const el = document.getElementById('creditList');
-  if (!credits.length) {
-    el.innerHTML = `<div class="credit-empty"><div class="e-icon">💳</div><p style="font-weight:700;color:var(--ink2)">Нет кредитов</p><p style="font-size:13px;margin-top:4px">Добавь кредит или кредитную карту</p></div>`;
-    return;
-  }
-
-  el.innerHTML = credits.map((c, i) => {
+function renderCreditCard(c, i) {
     const isCard  = c.type === 'card';
     const pct     = isCard
       ? (c.limit > 0 ? Math.round(c.debt / c.limit * 100) : 0)
@@ -833,10 +949,16 @@ function renderCredits() {
       ? new Date(c.date).toLocaleDateString('ru-RU', {day:'numeric', month:'long'})
       : '—';
 
-    return `<div class="credit-card">
+    const included = c.includeInTotal !== false;
+    return `<div class="credit-card" style="opacity:${included ? 1 : 0.55}">
       <div class="cr-head">
         <div class="cr-name">${esc(c.name)}</div>
         <span class="cr-type ${c.type}">${isCard ? 'Кредитная карта' : 'Кредит'}</span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:700;color:var(--mut2);margin-left:auto" title="Включить в общий платёж">
+          <input type="checkbox" ${included ? 'checked' : ''} onchange="toggleCreditInclude(${i}, this.checked)"
+            style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+          в расчёт
+        </label>
         <button class="btn" style="padding:4px 10px;font-size:11px" onclick="openCreditModal(${i})">✏️</button>
         <button class="btn" style="padding:4px 10px;font-size:11px;color:var(--red)" onclick="deleteCredit(${i})">✕</button>
       </div>
@@ -876,9 +998,64 @@ function renderCredits() {
         </div>
       </div>
     </div>`;
-  }).join('');
+
+}
 }
 
+function toggleCreditInclude(idx, val) {
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  if (!credits[idx]) return;
+  credits[idx].includeInTotal = val;
+  localStorage.setItem(CREDIT_KEY, JSON.stringify(credits));
+  updateBalTotal();
+  renderCredits();
+  if (gToken) driveSave();
+}
+
+function renderCredits() {
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  const el = document.getElementById('creditList');
+  if (!credits.length) {
+    el.innerHTML = `<div class="credit-empty"><div class="e-icon">💳</div><p style="font-weight:700;color:var(--ink2)">Нет кредитов</p><p style="font-size:13px;margin-top:4px">Добавь кредит или кредитную карту</p></div>`;
+    return;
+  }
+
+  const loans = credits.map((c,i) => ({...c, _i:i})).filter(c => c.type === 'loan');
+  const cards = credits.map((c,i) => ({...c, _i:i})).filter(c => c.type === 'card');
+  const loanTotal = loans.reduce((a,c) => a + (c.debt||0), 0);
+  const cardTotal = cards.reduce((a,c) => a + (c.debt||0), 0);
+  const loanPay   = loans.reduce((a,c) => a + (c.payment||0), 0);
+  const cardPay   = cards.reduce((a,c) => a + (c.payment||0), 0);
+
+  const renderSection = (items, title, icon, total, pay) => {
+    if (!items.length) return '';
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">${icon}</span>
+          <span style="font-size:15px;font-weight:800">${title}</span>
+          <span style="font-size:12px;background:var(--line2);border:1px solid var(--line);border-radius:20px;padding:2px 10px;font-weight:700;color:var(--mut2)">${items.length} шт.</span>
+        </div>
+        <div style="display:flex;gap:20px;text-align:right">
+          <div>
+            <div style="font-size:10px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Общий долг</div>
+            <div style="font-size:16px;font-weight:800;color:var(--red)">${RUB(total)}</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.4px">Платежей / мес</div>
+            <div style="font-size:16px;font-weight:800;color:var(--accent)">${RUB(pay)}</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px">
+        ${items.map(c => renderCreditCard(c, c._i)).join('')}
+      </div>`;
+  };
+
+  el.innerHTML =
+    renderSection(loans, 'Кредиты и рассрочки', '🏦', loanTotal, loanPay) +
+    renderSection(cards, 'Кредитные карты', '💳', cardTotal, cardPay);
+}
 // ═══════════════════════════════════════════════════════
 //  FILTERS
 // ═══════════════════════════════════════════════════════
@@ -1017,8 +1194,9 @@ function drawTable(rows) {
       color:${isDebt ? 'var(--amber)' : 'var(--mut)'};
       transition:.15s;white-space:nowrap;
     ">${isDebt ? '💰 Долг' : 'Долг'}</button>`;
-    return `<tr>
-      <td style="white-space:nowrap;color:var(--mut2);font-size:12px">${d.date}</td>
+    const isIgnored = !!d.ignored;
+    return `<tr oncontextmenu="openCtxMenu(event,${idx})" style="cursor:context-menu;opacity:${isIgnored?0.38:1}">
+      <td style="white-space:nowrap;color:var(--mut2);font-size:12px">${d.date}${isIgnored?'&nbsp;<span style="font-size:10px;background:var(--line2);border-radius:4px;padding:1px 5px;color:var(--mut)">скрыта</span>':''}</td>
       <td><span class="bankpill">${esc(d.bank)}</span></td>
       <td><span class="tag ${d.type}">${TYPE_LABEL[d.type]||d.type}</span></td>
       <td><span class="cat-pill" title="${esc(d.category)}">${esc(d.category||'—')}</span></td>
@@ -1208,7 +1386,7 @@ function parseTbankCSV(text) {
     const desc = (r[11]||'').trim();
     let typ;
     const dl = desc.toLowerCase();
-    if (dl.startsWith('между своими') || dl.includes('даниил')) typ = 'self';
+    if (dl.startsWith('между своими') || dl.includes('даниил') || dl.includes('кубышк') || dl.startsWith('пополнение кубышки') || dl.startsWith('перевод средств из кубышки')) typ = 'self';
     else if (cat === 'Наличные') typ = 'cash';
     else if (cat === 'Переводы') typ = 'transfer';
     else typ = amt < 0 ? 'expense' : 'income';
@@ -1503,6 +1681,268 @@ async function driveSave() {
     }
     setSync('сохранено ' + new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}), true);
   } catch(e) { setSync('ошибка сохранения'); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PLAN PAYMENTS
+// ═══════════════════════════════════════════════════════
+const SAL_KEY  = 'finance_salary_v1';
+const PLAN_KEY = 'finance_plan_v1';
+const CAT_ICONS = { rent:'🏠', sub:'📱', food:'🛒', transport:'🚗', health:'💊', other:'📦', credit:'💳' };
+const CAT_NAMES = { rent:'Жильё', sub:'Подписки', food:'Продукты', transport:'Транспорт', health:'Здоровье', other:'Прочее', credit:'Кредит' };
+
+let _planMonth = new Date().getMonth();
+let _planYear  = new Date().getFullYear();
+let _editPlanIdx = -1;
+
+function saveSalary() {
+  const s1 = parseFloat(document.getElementById('sal1').value) || 0;
+  const s2 = parseFloat(document.getElementById('sal2').value) || 0;
+  localStorage.setItem(SAL_KEY, JSON.stringify({s1, s2}));
+  renderPlanTimeline();
+}
+function loadSalary() {
+  const d = JSON.parse(localStorage.getItem(SAL_KEY) || '{}');
+  document.getElementById('sal1').value = d.s1 || '';
+  document.getElementById('sal2').value = d.s2 || '';
+  renderPlanTimeline();
+}
+
+function openPlanModal(idx) {
+  _editPlanIdx = idx !== undefined ? idx : -1;
+  const plans = JSON.parse(localStorage.getItem(PLAN_KEY) || '[]');
+  const p = _editPlanIdx >= 0 ? plans[_editPlanIdx] : null;
+  document.getElementById('planModalTitle').textContent = p ? '✏️ Редактировать' : '+ Плановый платёж';
+  document.getElementById('pmName').value   = p?.name   || '';
+  document.getElementById('pmAmt').value    = p?.amt    || '';
+  document.getElementById('pmDay').value    = p?.day    || '';
+  document.getElementById('pmCat').value    = p?.cat    || 'other';
+  document.getElementById('pmRepeat').value = p?.repeat || 'monthly';
+  document.getElementById('planModal').classList.add('show');
+}
+function savePlanPayment() {
+  const name = document.getElementById('pmName').value.trim();
+  const amt  = parseFloat(document.getElementById('pmAmt').value);
+  const day  = parseInt(document.getElementById('pmDay').value);
+  if (!name) { toast('Укажи название'); return; }
+  if (isNaN(amt) || amt <= 0) { toast('Укажи сумму'); return; }
+  if (isNaN(day) || day < 1 || day > 31) { toast('Укажи день 1–31'); return; }
+  const plans = JSON.parse(localStorage.getItem(PLAN_KEY) || '[]');
+  const entry = { name, amt, day, cat: pmCat.value, repeat: pmRepeat.value };
+  if (_editPlanIdx >= 0) plans[_editPlanIdx] = entry; else plans.push(entry);
+  localStorage.setItem(PLAN_KEY, JSON.stringify(plans));
+  document.getElementById('planModal').classList.remove('show');
+  renderPlanTimeline();
+  if (gToken) driveSave();
+}
+function deletePlanPayment(idx) {
+  const plans = JSON.parse(localStorage.getItem(PLAN_KEY) || '[]');
+  plans.splice(idx, 1);
+  localStorage.setItem(PLAN_KEY, JSON.stringify(plans));
+  renderPlanTimeline();
+}
+
+function planPrevMonth() { _planMonth--; if (_planMonth < 0) { _planMonth = 11; _planYear--; } renderPlanTimeline(); }
+function planNextMonth() { _planMonth++; if (_planMonth > 11) { _planMonth = 0; _planYear++; } renderPlanTimeline(); }
+
+function renderPlanTimeline() {
+  const sal  = JSON.parse(localStorage.getItem(SAL_KEY)  || '{}');
+  const plans = JSON.parse(localStorage.getItem(PLAN_KEY) || '[]');
+  const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
+  const s1 = sal.s1 || 0, s2 = sal.s2 || 0;
+  const totalSal = s1 + s2;
+
+  // Month label
+  const monthName = new Date(_planYear, _planMonth, 1).toLocaleDateString('ru-RU', { month:'long', year:'numeric' });
+  document.getElementById('planMonthLabel').textContent = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+  document.getElementById('salTotal').textContent = RUB(totalSal);
+
+  // Collect all events for this month
+  const events = [];
+
+  // Зарплаты
+  events.push({ day:10, type:'income', name:'Зарплата (аванс)', amt:s1, cat:'salary' });
+  events.push({ day:25, type:'income', name:'Зарплата (основная)', amt:s2, cat:'salary' });
+
+  // Кредиты
+  credits.forEach(c => {
+    if (!c.payment || !c.date) return;
+    const d = new Date(c.date);
+    events.push({ day: d.getDate(), type:'credit', name: c.name, amt: c.payment, cat:'credit', creditType: c.type });
+  });
+
+  // Плановые платежи
+  plans.forEach((p, i) => {
+    events.push({ day: p.day, type:'plan', name: p.name, amt: p.amt, cat: p.cat, planIdx: i });
+  });
+
+  // Сортируем по дням
+  events.sort((a,b) => a.day - b.day || (a.type === 'income' ? -1 : 1));
+
+  // Рассчитываем накопительный баланс по периодам ЗП
+  // Период 1: 25 прошлого — 10 текущего (деньги от с ЗП-2)
+  // Период 2: 10 текущего — 25 текущего (деньги от ЗП-1)
+  // Период 3: 25 текущего — 10 следующего (деньги от ЗП-2)
+
+  let balance = 0; // накопительный по месяцу
+  const today = new Date();
+  const isCurrentMonth = _planMonth === today.getMonth() && _planYear === today.getFullYear();
+
+  // Группируем по дням
+  const byDay = {};
+  events.forEach(e => {
+    if (!byDay[e.day]) byDay[e.day] = [];
+    byDay[e.day].push(e);
+  });
+
+  // Строим HTML
+  let html = '';
+  let runningBal = 0;
+
+  // Периоды между ЗП
+  const salaryDays = [10, 25];
+  const allDays = [...new Set(events.map(e => e.day))].sort((a,b) => a-b);
+
+  // Считаем итог каждого периода
+  const period1spend = events.filter(e => e.type !== 'income' && e.day <= 10).reduce((a,e) => a+e.amt, 0);
+  const period2spend = events.filter(e => e.type !== 'income' && e.day > 10 && e.day <= 25).reduce((a,e) => a+e.amt, 0);
+  const period3spend = events.filter(e => e.type !== 'income' && e.day > 25).reduce((a,e) => a+e.amt, 0);
+
+  const totalSpend = period1spend + period2spend + period3spend;
+  const netBalance = totalSal - totalSpend;
+
+  // Обновляем шапку
+  document.getElementById('planBalance').textContent =
+    netBalance >= 0
+      ? `остаток после всех платежей: ${RUB(netBalance)}`
+      : `дефицит: ${RUB(Math.abs(netBalance))}`;
+  document.getElementById('planBalance').style.color = netBalance >= 0 ? '#86efac' : '#f87171';
+
+  // Рендер блоков по периодам
+  const renderPeriodBlock = (label, fromDay, toDay, incomeDay, incomeAmt, color) => {
+    const periodEvents = events.filter(e => {
+      if (e.type === 'income') return e.day === incomeDay;
+      return e.day > fromDay && e.day <= toDay;
+    });
+    const spending = periodEvents.filter(e => e.type !== 'income').reduce((a,e) => a+e.amt, 0);
+    const income   = incomeAmt;
+    const left     = income - spending;
+    const isNow    = isCurrentMonth && today.getDate() >= fromDay && today.getDate() < toDay;
+
+    let evHtml = '';
+    // Сначала доход
+    const incEv = periodEvents.filter(e => e.type === 'income');
+    const expEv = periodEvents.filter(e => e.type !== 'income');
+
+    incEv.forEach(e => {
+      evHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(22,163,74,.08);border-radius:10px;margin-bottom:8px;border:1px solid rgba(22,163,74,.15)">
+        <div style="width:32px;height:32px;border-radius:8px;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💵</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:#15803d">${esc(e.name)}</div>
+          <div style="font-size:11px;color:var(--mut2)">${e.day}-го числа</div>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:#16a34a">+${RUB(e.amt)}</div>
+      </div>`;
+    });
+
+    if (expEv.length === 0 && incEv.length === 0) {
+      evHtml = '<div style="text-align:center;color:var(--mut);font-size:13px;padding:12px 0">Нет платежей в этот период</div>';
+    }
+
+    expEv.forEach(e => {
+      const isCredit = e.type === 'credit';
+      const isPlan   = e.type === 'plan';
+      const icon = isCredit ? (e.creditType === 'card' ? '💳' : '🏦') : (CAT_ICONS[e.cat] || '📦');
+      const isToday = isCurrentMonth && today.getDate() === e.day;
+      const isPast  = isCurrentMonth && today.getDate() > e.day;
+      evHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-radius:10px;margin-bottom:8px;border:1px solid ${isToday ? 'var(--amber)' : 'var(--line)'};opacity:${isPast ? 0.6 : 1}">
+        <div style="width:32px;height:32px;border-radius:8px;background:${isCredit ? 'var(--red-light)' : 'var(--line2)'};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${icon}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800">${esc(e.name)}</div>
+          <div style="font-size:11px;color:var(--mut2)">${e.day}-го · ${isCredit ? 'Кредит' : (CAT_NAMES[e.cat]||'Прочее')}${isToday ? ' · <span style="color:var(--amber);font-weight:700">сегодня!</span>' : ''}${isPast ? ' · оплачено' : ''}</div>
+        </div>
+        ${isPlan ? `<button onclick="openPlanModal(${e.planIdx})" style="font-size:11px;background:none;border:1px solid var(--line);border-radius:6px;padding:2px 7px;cursor:pointer;font-family:Manrope;color:var(--mut2)">✏️</button>
+        <button onclick="deletePlanPayment(${e.planIdx})" style="font-size:11px;background:none;border:1px solid var(--line);border-radius:6px;padding:2px 7px;cursor:pointer;font-family:Manrope;color:var(--red)">✕</button>` : ''}
+        <div style="font-size:15px;font-weight:800;color:var(--red)">−${RUB(e.amt)}</div>
+      </div>`;
+    });
+
+    return `<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden;${isNow ? 'border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.08)' : ''}">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:${isNow ? 'var(--accent-light)' : 'var(--line2)'}">
+        <div>
+          <div style="font-size:13px;font-weight:800;${isNow ? 'color:var(--accent)' : ''}">${label}${isNow ? ' · <span style="font-size:11px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:20px">сейчас</span>' : ''}</div>
+          <div style="font-size:11px;color:var(--mut2);margin-top:2px">доход ${RUB(income)} · расходы ${RUB(spending)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--mut2)">остаток</div>
+          <div style="font-size:18px;font-weight:800;color:${left >= 0 ? 'var(--green)' : 'var(--red)'}">${RUB(left)}</div>
+        </div>
+      </div>
+      <div style="padding:14px 18px">${evHtml}</div>
+    </div>`;
+  };
+
+  html += renderPeriodBlock(
+    'С 1-го по 10-е', 0, 10, 10, s1
+  );
+  html += renderPeriodBlock(
+    'С 10-го по 25-е', 10, 25, 25, s2
+  );
+  html += renderPeriodBlock(
+    'С 25-го до конца месяца', 25, 32, 99, 0
+  );
+
+  document.getElementById('planTimeline').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+//  CONTEXT MENU
+// ═══════════════════════════════════════════════════════
+let _ctxIdx = -1;
+
+function openCtxMenu(e, idx) {
+  e.preventDefault();
+  _ctxIdx = idx;
+  const d = DATA[idx];
+  const menu = document.getElementById('ctxMenu');
+
+  // Обновляем текст кнопки игнора
+  document.getElementById('ctxIgnore').textContent = d.ignored ? '✅ Учитывать снова' : '🚫 Не учитывать';
+  document.getElementById('ctxDebt').textContent   = d.debt    ? '💰 Убрать долг'    : '💰 Пометить как долг';
+  document.getElementById('ctxSelf').style.display = d.type === 'self' ? 'none' : '';
+
+  // Позиция меню
+  const x = Math.min(e.clientX, window.innerWidth  - 220);
+  const y = Math.min(e.clientY, window.innerHeight - 180);
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+  menu.classList.add('show');
+}
+
+function closeCtxMenu() { document.getElementById('ctxMenu').classList.remove('show'); }
+document.addEventListener('click', closeCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCtxMenu(); });
+
+function ctxAction(action) {
+  closeCtxMenu();
+  if (_ctxIdx < 0 || !DATA[_ctxIdx]) return;
+  const d = DATA[_ctxIdx];
+  if (action === 'ignore') {
+    d.ignored = !d.ignored;
+    toast(d.ignored ? '🚫 Операция скрыта из расчётов' : '✅ Операция снова учитывается');
+  } else if (action === 'debt') {
+    d.debt = !d.debt;
+    if (!d.debt) d.debtClosed = false;
+    toast(d.debt ? '💰 Помечено как долг' : 'Долг убран');
+  } else if (action === 'self') {
+    d.type = 'self';
+    toast('🔄 Помечено как перевод между своими');
+  } else if (action === 'delete') {
+    if (!confirm('Удалить эту операцию?')) return;
+    DATA.splice(_ctxIdx, 1);
+    toast('Операция удалена');
+  }
+  save(); initFilters(); render();
 }
 
 // ═══════════════════════════════════════════════════════
