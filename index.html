@@ -1816,15 +1816,28 @@ function renderPlanTimeline() {
   document.getElementById('planBalance').style.color = netBalance >= 0 ? '#86efac' : '#f87171';
 
   // Рендер блоков по периодам
-  const renderPeriodBlock = (label, sublabel, fromDay, toDay, incomeDay, incomeAmt) => {
+  const renderPeriodBlock = (label, sublabel, dayRanges, incomeDay, incomeAmt) => {
+    // dayRanges: [from1, to1, from2, to2, ...] — пары диапазонов (включительно from+1 до to)
+    const inRange = day => {
+      for (let i = 0; i < dayRanges.length; i += 2) {
+        if (day > dayRanges[i] && day <= dayRanges[i+1]) return true;
+      }
+      return false;
+    };
     const periodEvents = events.filter(e => {
       if (e.type === 'income') return e.day === incomeDay;
-      return e.day > fromDay && e.day <= toDay;
+      return inRange(e.day);
     });
+    const fromDay = dayRanges[0]; // для isNow
+    const toDay   = dayRanges[dayRanges.length - 1];
     const spending = periodEvents.filter(e => e.type !== 'income').reduce((a,e) => a+e.amt, 0);
     const income   = incomeAmt;
     const left     = income - spending;
-    const isNow    = isCurrentMonth && today.getDate() > fromDay && today.getDate() <= toDay;
+    const isNow    = isCurrentMonth && (
+      dayRanges.length === 4
+        ? (today.getDate() > dayRanges[0] && today.getDate() <= dayRanges[1]) || (today.getDate() > dayRanges[2] && today.getDate() <= dayRanges[3])
+        : today.getDate() > dayRanges[0] && today.getDate() <= dayRanges[1]
+    );
 
     let evHtml = '';
     const incEv = periodEvents.filter(e => e.type === 'income');
@@ -1878,19 +1891,22 @@ function renderPlanTimeline() {
     </div>`;
   };
 
-  // Период 1: 25-е → 10-е, живём на аванс (s1), платежи с 1 по 10
+  // Период 1: 25-е → 10-е, живём на аванс (s1)
+  // Платежи: 26–31 текущего + 1–10 текущего (всё что до и включая 10-е, плюс после 25-го)
   html += renderPeriodBlock(
     '25-е → 10-е · Аванс',
     `аванс ${RUB(s1)}`,
-    0, 10, 10, s1
+    [0, 10, 25, 31], // дни: 1–10 и 26–31
+    10, s1
   );
 
-  // Период 2: 10-е → 25-е, живём на основную (s2), платежи с 11 по 25
-  // + платежи после 25 тоже попадают сюда (до следующей ЗП)
+  // Период 2: 10-е → 25-е, живём на основную (s2)
+  // Платежи: 11–25
   html += renderPeriodBlock(
     '10-е → 25-е · Основная ЗП',
     `зарплата ${RUB(s2)}`,
-    10, 31, 25, s2
+    [10, 25], // дни: 11–25
+    25, s2
   );
 
   document.getElementById('planTimeline').innerHTML = html;
