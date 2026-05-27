@@ -1659,12 +1659,14 @@ async function driveLoad() {
     const r = await fetch(`https://www.googleapis.com/drive/v3/files/${gFileId}?alt=media`, { headers:{ Authorization:'Bearer '+gToken } });
     const j = await r.json();
 
-    // Поддержка старого формата (просто массив) и нового (объект со всеми данными)
+    let isOldFormat = false;
     if (Array.isArray(j)) {
+      // Старый формат — только операции
       DATA = j;
+      isOldFormat = true;
     } else if (j && typeof j === 'object') {
-      if (Array.isArray(j.data))     DATA = j.data;
-      else if (Array.isArray(j.ops)) DATA = j.ops;
+      if (Array.isArray(j.ops))  DATA = j.ops;
+      else if (Array.isArray(j.data)) DATA = j.data;
       if (j.credits)  localStorage.setItem(CREDIT_KEY, JSON.stringify(j.credits));
       if (j.balances) localStorage.setItem(BAL_KEY,    JSON.stringify(j.balances));
       if (j.salary)   localStorage.setItem(SAL_KEY,    JSON.stringify(j.salary));
@@ -1672,7 +1674,21 @@ async function driveLoad() {
     }
 
     save(); initFilters(); render();
+
+    // Если открыта вкладка балансов — перерисовываем
+    if (document.getElementById('tab-bal')?.classList.contains('active')) {
+      loadBalances(); renderCredits();
+    }
+    if (document.getElementById('tab-plan')?.classList.contains('active')) {
+      loadSalary(); renderPlanTimeline();
+    }
+
     setSync('загружено из Google Drive', true);
+
+    // Если старый формат — сразу перезаписываем Drive в новом формате
+    if (isOldFormat) {
+      await driveSave();
+    }
   } catch(e) { setSync('ошибка загрузки'); }
 }
 async function driveSave() {
