@@ -1658,8 +1658,19 @@ async function driveLoad() {
     if (!gFileId) { await driveSave(); return; }
     const r = await fetch(`https://www.googleapis.com/drive/v3/files/${gFileId}?alt=media`, { headers:{ Authorization:'Bearer '+gToken } });
     const j = await r.json();
-    if (Array.isArray(j)) DATA = j;
-    else if (j && Array.isArray(j.data)) DATA = j.data;
+
+    // Поддержка старого формата (просто массив) и нового (объект со всеми данными)
+    if (Array.isArray(j)) {
+      DATA = j;
+    } else if (j && typeof j === 'object') {
+      if (Array.isArray(j.data))     DATA = j.data;
+      else if (Array.isArray(j.ops)) DATA = j.ops;
+      if (j.credits)  localStorage.setItem(CREDIT_KEY, JSON.stringify(j.credits));
+      if (j.balances) localStorage.setItem(BAL_KEY,    JSON.stringify(j.balances));
+      if (j.salary)   localStorage.setItem(SAL_KEY,    JSON.stringify(j.salary));
+      if (j.plan)     localStorage.setItem(PLAN_KEY,   JSON.stringify(j.plan));
+    }
+
     save(); initFilters(); render();
     setSync('загружено из Google Drive', true);
   } catch(e) { setSync('ошибка загрузки'); }
@@ -1667,7 +1678,16 @@ async function driveLoad() {
 async function driveSave() {
   if (!gToken) return;
   try {
-    const body = JSON.stringify(DATA);
+    // Собираем все данные в один объект
+    const bundle = {
+      ops:      DATA,
+      credits:  JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]'),
+      balances: JSON.parse(localStorage.getItem(BAL_KEY)    || '{}'),
+      salary:   JSON.parse(localStorage.getItem(SAL_KEY)    || '{}'),
+      plan:     JSON.parse(localStorage.getItem(PLAN_KEY)   || '[]'),
+      savedAt:  new Date().toISOString(),
+    };
+    const body = JSON.stringify(bundle);
     const meta = { name:DRIVE_FILENAME, mimeType:'application/json' };
     if (!gFileId) {
       const form = new FormData();
