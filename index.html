@@ -798,17 +798,22 @@ function switchTab(name) {
 const BAL_KEY = 'finance_balances_v1';
 const CREDIT_KEY = 'finance_credits_v1';
 
+// Маппинг ключей банков → названия в DATA
+const BANK_MAP = { tbank:'Т-Банк', alfa:'Альфа', yandex:'Яндекс' };
+
 function saveBalances() {
-  const now = new Date().toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+  const nowISO = new Date().toISOString();
+  const nowStr = new Date().toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
   const prev = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
   const data = {};
   ['tbank','alfa','yandex'].forEach(b => {
-    const val = parseFloat(document.getElementById('bal-'+b).value) || 0;
+    const val    = parseFloat(document.getElementById('bal-'+b).value) || 0;
     const prevVal = prev[b]?.val ?? null;
-    // Обновляем дату только если значение изменилось
+    const changed = prevVal === null || val !== prevVal;
     data[b] = {
-      val,
-      updated: (prevVal === null || val !== prevVal) ? now : (prev[b]?.updated || now)
+      val,                                              // введённый остаток
+      snapshotDate: changed ? nowISO : (prev[b]?.snapshotDate || nowISO), // дата снапшота
+      updated:      changed ? nowStr : (prev[b]?.updated || nowStr),
     };
   });
   localStorage.setItem(BAL_KEY, JSON.stringify(data));
@@ -823,7 +828,7 @@ function loadBalances() {
     const upd = document.getElementById('bal-'+b+'-upd');
     if (data[b] && data[b].val !== undefined) {
       el.value = data[b].val || '';
-      upd.textContent = data[b].updated ? 'обновлено: ' + data[b].updated : 'загружено из Drive';
+      upd.textContent = data[b].updated ? 'снапшот: ' + data[b].updated : 'загружено из Drive';
     } else {
       upd.textContent = 'не обновлялся';
     }
@@ -831,11 +836,49 @@ function loadBalances() {
   updateBalTotal();
 }
 
+// Считает текущий баланс банка = снапшот + операции после даты снапшота
+function calcCurrentBalance(bankKey, snapVal, snapDateISO) {
+  if (!snapDateISO) return snapVal;
+  const bankName = BANK_MAP[bankKey];
+  const snapDate = new Date(snapDateISO);
+  const ops = DATA.filter(d => {
+    if (d.bank !== bankName) return false;
+    if (d.ignored) return false;
+    if (d.type === 'self') return false;
+    return new Date(d.date) > snapDate;
+  });
+  const delta = ops.reduce((a, d) => a + d.amount, 0);
+  return snapVal + delta;
+}
+
 function updateBalTotal() {
-  const tbank  = parseFloat(document.getElementById('bal-tbank').value)  || 0;
-  const alfa   = parseFloat(document.getElementById('bal-alfa').value)    || 0;
-  const yandex = parseFloat(document.getElementById('bal-yandex').value)  || 0;
+  const data   = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
+
+  const tbankSnap  = data.tbank  || {};
+  const alfaSnap   = data.alfa   || {};
+  const yandexSnap = data.yandex || {};
+
+  const tbank  = calcCurrentBalance('tbank',  parseFloat(tbankSnap.val)  || 0, tbankSnap.snapshotDate);
+  const alfa   = calcCurrentBalance('alfa',   parseFloat(alfaSnap.val)   || 0, alfaSnap.snapshotDate);
+  const yandex = calcCurrentBalance('yandex', parseFloat(yandexSnap.val) || 0, yandexSnap.snapshotDate);
   const total  = tbank + alfa + yandex;
+
+  // Обновляем отображаемые значения в полях (расчётный баланс)
+  const fmtVal = v => Math.round(v).toString();
+  ['tbank','alfa','yandex'].forEach((b, i) => {
+    const calc = [tbank, alfa, yandex][i];
+    const snap = [tbankSnap, alfaSnap, yandexSnap][i];
+    const inp  = document.getElementById('bal-'+b);
+    const upd  = document.getElementById('bal-'+b+'-upd');
+    if (inp && snap.snapshotDate) {
+      // Показываем расчётный баланс под полем
+      const delta = calc - (parseFloat(snap.val) || 0);
+      const deltaStr = delta !== 0
+        ? ` (${delta > 0 ? '+' : ''}${Math.round(delta)} ₽ с момента снапшота)`
+        : '';
+      if (upd) upd.textContent = (snap.updated || '') + deltaStr;
+    }
+  });
 
   const credits = JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]');
   const creditDebt    = credits.reduce((a,c) => a + (parseFloat(c.debt) || 0), 0);
