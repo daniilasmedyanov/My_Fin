@@ -582,9 +582,9 @@ tr:hover td { background: var(--line2); }
     <!-- ЗП настройки -->
     <div class="bal-total-card" style="margin-bottom:20px">
       <div>
-        <div class="lbl">Зарплата 1-я часть</div>
+        <div class="lbl">Основная зарплата</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-          <span style="opacity:.6;font-size:13px">10-го числа</span>
+          <span style="opacity:.6;font-size:13px">приходит 10-го</span>
           <div style="border-bottom:2px solid rgba(255,255,255,.3);display:flex;align-items:center;gap:4px">
             <input id="sal1" type="number" placeholder="0" oninput="saveSalary()" style="font-family:Manrope;font-size:22px;font-weight:800;border:none;outline:none;background:none;color:#fff;width:130px;letter-spacing:-.5px">
             <span style="font-size:16px;opacity:.5">₽</span>
@@ -592,9 +592,9 @@ tr:hover td { background: var(--line2); }
         </div>
       </div>
       <div>
-        <div class="lbl">Зарплата 2-я часть</div>
+        <div class="lbl">Аванс</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
-          <span style="opacity:.6;font-size:13px">25-го числа</span>
+          <span style="opacity:.6;font-size:13px">приходит 25-го</span>
           <div style="border-bottom:2px solid rgba(255,255,255,.3);display:flex;align-items:center;gap:4px">
             <input id="sal2" type="number" placeholder="0" oninput="saveSalary()" style="font-family:Manrope;font-size:22px;font-weight:800;border:none;outline:none;background:none;color:#fff;width:130px;letter-spacing:-.5px">
             <span style="font-size:16px;opacity:.5">₽</span>
@@ -1796,8 +1796,8 @@ function renderPlanTimeline() {
   const events = [];
 
   // Зарплаты
-  events.push({ day:10, type:'income', name:'Зарплата (аванс)', amt:s1, cat:'salary' });
-  events.push({ day:25, type:'income', name:'Зарплата (основная)', amt:s2, cat:'salary' });
+  events.push({ day:10, type:'income', name:'Зарплата (основная)', amt:s1, cat:'salary' });
+  events.push({ day:25, type:'income', name:'Аванс', amt:s2, cat:'salary' });
 
   // Кредиты
   credits.forEach(c => {
@@ -1932,8 +1932,8 @@ function renderPlanTimeline() {
   // Период 1: 25-е → 10-е
   // Платишь: 26–31 + 1–10. В конце периода приходит аванс 10-го.
   html += renderPeriodBlock(
-    '25-е → 10-е',
-    `платежи до 10-го · аванс приходит 10-го`,
+    '25-е → 10-е · живёшь на основную',
+    `платежи до 10-го · основная зарплата приходит 10-го`,
     [0, 10, 25, 31],
     10, s1
   );
@@ -1941,8 +1941,8 @@ function renderPlanTimeline() {
   // Период 2: 10-е → 25-е
   // Платишь: 11–25. В конце периода приходит основная 25-го.
   html += renderPeriodBlock(
-    '10-е → 25-е',
-    `платежи до 25-го · зарплата приходит 25-го`,
+    '10-е → 25-е · живёшь на аванс',
+    `платежи до 25-го · аванс приходит 25-го`,
     [10, 25],
     25, s2
   );
