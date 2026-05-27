@@ -799,14 +799,17 @@ const BAL_KEY = 'finance_balances_v1';
 const CREDIT_KEY = 'finance_credits_v1';
 
 function saveBalances() {
-  const now = new Date().toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  const banks = ['tbank','alfa','yandex'];
+  const now = new Date().toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+  const prev = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
   const data = {};
-  banks.forEach(b => {
+  ['tbank','alfa','yandex'].forEach(b => {
     const val = parseFloat(document.getElementById('bal-'+b).value) || 0;
-    const prev = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
-    data[b] = { val, updated: val !== (prev[b]?.val || 0) ? now : (prev[b]?.updated || 'не обновлялся') };
-    if (val !== (prev[b]?.val || null)) data[b].updated = now;
+    const prevVal = prev[b]?.val ?? null;
+    // Обновляем дату только если значение изменилось
+    data[b] = {
+      val,
+      updated: (prevVal === null || val !== prevVal) ? now : (prev[b]?.updated || now)
+    };
   });
   localStorage.setItem(BAL_KEY, JSON.stringify(data));
   updateBalTotal();
@@ -816,11 +819,13 @@ function saveBalances() {
 function loadBalances() {
   const data = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
   ['tbank','alfa','yandex'].forEach(b => {
-    const el = document.getElementById('bal-'+b);
+    const el  = document.getElementById('bal-'+b);
     const upd = document.getElementById('bal-'+b+'-upd');
-    if (data[b]) {
+    if (data[b] && data[b].val !== undefined) {
       el.value = data[b].val || '';
-      upd.textContent = 'обновлено: ' + (data[b].updated || '—');
+      upd.textContent = data[b].updated ? 'обновлено: ' + data[b].updated : 'загружено из Drive';
+    } else {
+      upd.textContent = 'не обновлялся';
     }
   });
   updateBalTotal();
@@ -1338,7 +1343,15 @@ function addOp() {
 //  EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════
 function exportData() {
-  const blob = new Blob([JSON.stringify(DATA, null, 2)], { type:'application/json' });
+  const bundle = {
+    ops:      DATA,
+    credits:  JSON.parse(localStorage.getItem(CREDIT_KEY) || '[]'),
+    balances: JSON.parse(localStorage.getItem(BAL_KEY)    || '{}'),
+    salary:   JSON.parse(localStorage.getItem(SAL_KEY)    || '{}'),
+    plan:     JSON.parse(localStorage.getItem(PLAN_KEY)   || '[]'),
+    savedAt:  new Date().toISOString(),
+  };
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type:'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = 'finance_backup_' + new Date().toISOString().slice(0,10) + '.json';
@@ -1349,9 +1362,23 @@ function importData(e) {
   const r = new FileReader();
   r.onload = () => {
     try {
-      const d = JSON.parse(r.result);
-      if (Array.isArray(d)) { DATA = d; save(); initFilters(); render(); toast('✓ Загружено: ' + d.length + ' операций'); }
-      else toast('Неверный формат файла');
+      const j = JSON.parse(r.result);
+      // Поддержка старого формата (просто массив) и нового
+      if (Array.isArray(j)) {
+        DATA = j;
+        toast('✓ Загружено: ' + j.length + ' операций (старый формат, кредиты не включены)');
+      } else if (j && typeof j === 'object') {
+        if (Array.isArray(j.ops))       DATA = j.ops;
+        else if (Array.isArray(j.data)) DATA = j.data;
+        if (j.credits)  localStorage.setItem(CREDIT_KEY, JSON.stringify(j.credits));
+        if (j.balances) localStorage.setItem(BAL_KEY,    JSON.stringify(j.balances));
+        if (j.salary)   localStorage.setItem(SAL_KEY,    JSON.stringify(j.salary));
+        if (j.plan)     localStorage.setItem(PLAN_KEY,   JSON.stringify(j.plan));
+        toast(`✓ Загружено: ${DATA.length} операций · ${(j.credits||[]).length} кредитов · балансы · платежи`);
+      } else {
+        toast('Неверный формат файла'); return;
+      }
+      save(); initFilters(); render();
     } catch(err) { toast('Ошибка чтения файла'); }
   };
   r.readAsText(f); e.target.value='';
@@ -1734,6 +1761,7 @@ function saveSalary() {
   const s1 = parseFloat(document.getElementById('sal1').value) || 0;
   const s2 = parseFloat(document.getElementById('sal2').value) || 0;
   localStorage.setItem(SAL_KEY, JSON.stringify({s1, s2}));
+  if (gToken) driveSave();
   renderPlanTimeline();
 }
 function loadSalary() {
@@ -1879,7 +1907,18 @@ function renderPlanTimeline() {
     const incEv = periodEvents.filter(e => e.type === 'income');
     const expEv = periodEvents.filter(e => e.type !== 'income');
 
-    // Сначала расходы, потом ЗП в конце (она приходит в конце периода)
+    // ЗП сверху — она уже пришла, платежи идут из неё
+    incEv.forEach(e => {
+      evHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(22,163,74,.08);border-radius:10px;margin-bottom:12px;border:1px solid rgba(22,163,74,.2)">
+        <div style="width:32px;height:32px;border-radius:8px;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💵</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:#15803d">${esc(e.name)}</div>
+          <div style="font-size:11px;color:var(--mut2)">${e.day}-го числа · поступление</div>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:#16a34a">+${RUB(e.amt)}</div>
+      </div>`;
+    });
+
     if (expEv.length === 0 && incEv.length === 0) {
       evHtml = '<div style="text-align:center;color:var(--mut);font-size:13px;padding:12px 0">Нет платежей в этот период</div>';
     }
@@ -1902,18 +1941,6 @@ function renderPlanTimeline() {
       </div>`;
     });
 
-    // ЗП в конце периода
-    incEv.forEach(e => {
-      evHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(22,163,74,.08);border-radius:10px;margin-top:4px;border:1px solid rgba(22,163,74,.2)">
-        <div style="width:32px;height:32px;border-radius:8px;background:#16a34a;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">💵</div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:800;color:#15803d">${esc(e.name)}</div>
-          <div style="font-size:11px;color:var(--mut2)">${e.day}-го числа · поступление</div>
-        </div>
-        <div style="font-size:15px;font-weight:800;color:#16a34a">+${RUB(e.amt)}</div>
-      </div>`;
-    });
-
     return `<div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden;${isNow ? 'border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.08)' : ''}">
       <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:${isNow ? 'var(--accent-light)' : 'var(--line2)'}">
         <div>
@@ -1929,21 +1956,21 @@ function renderPlanTimeline() {
     </div>`;
   };
 
-  // Период 1: 25-е → 10-е
-  // Платишь: 26–31 + 1–10. В конце периода приходит аванс 10-го.
+  // Период 1: 10-е → 25-е
+  // Приходит основная ЗП 10-го, платим ею 11–25-го
   html += renderPeriodBlock(
-    '25-е → 10-е · живёшь на основную',
-    `платежи до 10-го · основная зарплата приходит 10-го`,
-    [0, 10, 25, 31],
+    '10-е → 25-е · Основная ЗП',
+    `основная ЗП ${RUB(s1)} пришла 10-го · платежи 11–25`,
+    [10, 25],
     10, s1
   );
 
-  // Период 2: 10-е → 25-е
-  // Платишь: 11–25. В конце периода приходит основная 25-го.
+  // Период 2: 25-е → 10-е
+  // Приходит аванс 25-го, платим им 26–31 + 1–10-го
   html += renderPeriodBlock(
-    '10-е → 25-е · живёшь на аванс',
-    `платежи до 25-го · аванс приходит 25-го`,
-    [10, 25],
+    '25-е → 10-е · Аванс',
+    `аванс ${RUB(s2)} пришёл 25-го · платежи 26–10`,
+    [0, 10, 25, 31],
     25, s2
   );
 
